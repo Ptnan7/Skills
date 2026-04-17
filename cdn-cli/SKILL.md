@@ -27,9 +27,12 @@ This skill covers two extensions in the `azure-cli-extensions` repo:
 
 When user asks to upgrade a swagger version, follow the workflow in [aaz-dev-setup.md](references/aaz-dev-setup.md) → **Swagger Upgrade Workflow**. Summary:
 
-1. **Create branches** — `git checkout -b <branch>` in both `extension` and `aaz` repos (Copilot)
-2. **Diff swagger** — compare old vs new (use [swagger-diff.md](references/swagger-diff.md))
-3. **Create workspace** — run `auto_select_resources.py --ext <cdn|front-door> --version <ver>` (Copilot)
-4. **Export workspace** — **Manual** in Web UI (user clicks Export). Wait for user to confirm.
-5. **Generate CLI** — After user confirms Export, agent calls API to update versions and generate code (Copilot)
-6. **Review & test** — `git diff`, bump version, `azdev linter`, `azdev test` (Copilot or manual)
+1. **Prepare Toolings workspace** — use `C:\Users\<User>\source\repos\Toolings` as the workspace and link `.github` to `C:\Users\<User>\source\repos\Skills` (Copilot or manual)
+2. **Initialize environment** — run `.github\cdn-cli\scripts\initialize_aaz_dev_env.ps1`; it auto-detects the repo root from the current workspace and creates any missing repo (`extension`, `swagger`, `aaz`, `cli`) plus the `azdev` venv (Copilot)
+3. **Activate environment** — run `.github\cdn-cli\scripts\use_aaz_dev_env.ps1` in every new terminal before Python or `aaz-dev` commands (Copilot or manual)
+4. **Create branches** — `git checkout -b <branch>` in both `extension` and `aaz` repos (Copilot)
+5. **Diff swagger** — run `python .github\cdn-cli\scripts\swagger_diff.py --ext <cdn|front-door> --old <old-ver> --new <new-ver>` to compare versions (Copilot). See [swagger-diff.md](references/swagger-diff.md)
+6. **Create workspace** — run `.github\cdn-cli\scripts\auto_select_resources.py --ext <cdn|front-door> --version <ver>` (Copilot)
+7. **Export workspace** — **Manual** in Web UI (user clicks Export). Wait for user to confirm.
+8. **Generate CLI** — After user confirms Export, agent calls API to update versions and generate code (Copilot)
+9. **Review & test** — `git diff`, bump version, `azdev linter`, `azdev test` (Copilot or manual)

@@ -4,36 +4,58 @@ Before updating AAZ-generated code for a new API version, compare the old and ne
 
 ---
 
+## Quick Diff with Script (Preferred)
+
+Use the automated diff script to compare two API versions. Requires `AAZ_SWAGGER_PATH` (set by `use_aaz_dev_env.ps1`).
+
+```powershell
+. .github\cdn-cli\scripts\use_aaz_dev_env.ps1
+
+# Front Door example: compare 2025-10-01 -> 2025-11-01
+python .github\cdn-cli\scripts\swagger_diff.py --ext front-door --old 2025-10-01 --new 2025-11-01
+
+# CDN example: compare 2024-02-01 -> 2025-09-01-preview
+python .github\cdn-cli\scripts\swagger_diff.py --ext cdn --old 2024-02-01 --new 2025-09-01-preview
+```
+
+The script:
+1. Parses the swagger `readme.md` to map version → tag → input files
+2. Loads and merges all JSON files for each tag
+3. Compares operations, models, enums, and parameters
+4. Reports added/removed/modified items and flags breaking changes
+
+**Wait for the user to acknowledge the diff** before proceeding with AAZ generation or code changes.
+
+---
+
 ## Locate the Current Version
 
 Read `.Autorest/README.md` (for PowerShell) or check the existing AAZ files at `azext_cdn/aaz/latest/` to identify the API version currently in use (e.g. `2024-02-01`, `stable` or `preview`).
 
----
+For CLI extensions, grep for `api-version` in the AAZ-generated Python files:
 
-## Determine the Swagger Source
-
-Ask the user if not already stated:
-
-- **Local clone** — the user has a local clone of `azure-rest-api-specs`. Ask for the repo root path (e.g. `C:\repos\azure-rest-api-specs`). The swagger file is at:
-  `<repo-root>/specification/cdn/resource-manager/Microsoft.Cdn/Cdn/<stable|preview>/<version>/openapi.json`
-
-- **GitHub** — read directly from GitHub:
-
-  | Channel | Browsable URL |
-  |---------|--------------|
-  | stable  | `https://github.com/Azure/azure-rest-api-specs/blob/main/specification/cdn/resource-manager/Microsoft.Cdn/Cdn/stable/<version>/openapi.json` |
-  | preview | `https://github.com/Azure/azure-rest-api-specs/blob/main/specification/cdn/resource-manager/Microsoft.Cdn/Cdn/preview/<version>/openapi.json` |
-
-  Fetch raw content via:
-  `https://raw.githubusercontent.com/Azure/azure-rest-api-specs/main/specification/cdn/resource-manager/Microsoft.Cdn/Cdn/<stable|preview>/<version>/openapi.json`
-
-For the old version, use whichever source is available. Mixed scenarios (e.g. old from GitHub, new from local) are fine.
+```powershell
+Get-ChildItem -Path "$env:AAZ_CLI_EXTENSION_PATH\src\front-door\azext_front_door\aaz\latest\" -Recurse -Filter "*.py" |
+  Select-String -Pattern "api-version" |
+  Select-Object -Property Line -Unique
+```
 
 ---
 
-## Diff the Two `openapi.json` Files
+## Manual Diff (Alternative)
 
-Focus on these areas:
+If the script is not available, compare manually:
+
+### Swagger Source Paths
+
+| Extension | Spec directory under `azure-rest-api-specs` |
+|-----------|---------------------------------------------|
+| CDN / AFD | `specification/cdn/resource-manager/Microsoft.Cdn/Cdn/` |
+| Front Door | `specification/frontdoor/resource-manager/Microsoft.Network/FrontDoor/` |
+
+Files are at `<spec-dir>/<stable|preview>/<version>/openapi.json` (or `network.json`, `webapplicationfirewall.json` for older multi-file tags).
+
+### Focus Areas
 
 | Area | What to look for |
 |------|-----------------|
@@ -42,9 +64,7 @@ Focus on these areas:
 | `parameters` | New or removed query/path/body parameters on existing operations |
 | `x-ms-enum` | New enum values or renamed members |
 
----
-
-## Summarize the Diff
+### Summarize the Diff
 
 Present before touching any code:
 

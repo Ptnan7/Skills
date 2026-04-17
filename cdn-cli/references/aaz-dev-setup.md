@@ -2,34 +2,62 @@
 
 > **CRITICAL**: ALL Python commands (`python`, `pip`, `aaz-dev`, scripts) MUST run inside the azdev virtual environment.
 > The system Python does NOT have `requests`, `aaz-dev`, or CLI extensions installed.
-> Always activate before any operation:
+> Preferred workspace is `C:\Users\<User>\source\repos\Toolings` with `.github` linked to `C:\Users\<User>\source\repos\Skills`.
+> Repo root is auto-detected from the current workspace; if detection fails, the fallback is `C:\Users\<User>\source\repos`.
+> Run one-time initialization first, then activate the shared environment in every new terminal:
 > ```powershell
-> & C:\Users\jingnanxu\source\repos\azdev\Scripts\Activate.ps1
+> & .github\cdn-cli\scripts\initialize_aaz_dev_env.ps1
+> . .github\cdn-cli\scripts\use_aaz_dev_env.ps1
 > ```
 
 ## Local Environment Setup
+
+## Toolings Workspace Layout
+
+Create the Toolings workspace once, then open `Toolings` in VS Code:
+
+```powershell
+$repoRoot = Join-Path $env:USERPROFILE "source\repos"
+$toolingsPath = Join-Path $repoRoot "Toolings"
+$skillsPath = Join-Path $repoRoot "Skills"
+$githubPath = Join-Path $toolingsPath ".github"
+
+New-Item -ItemType Directory -Force -Path $toolingsPath | Out-Null
+if (-not (Test-Path $githubPath)) {
+  New-Item -ItemType Junction -Path $githubPath -Target $skillsPath | Out-Null
+}
+```
+
+After that, all skill commands below assume the current workspace is `Toolings`.
+
+One-time bootstrap:
+
+```powershell
+& .github\cdn-cli\scripts\initialize_aaz_dev_env.ps1 -PersistUserRepoRoot
+```
+
+If the virtual environment or any of the four repos (`extension`, `swagger`, `aaz`, `cli`) is missing, the script creates the missing pieces automatically before continuing.
+
+For every new PowerShell terminal:
+
+```powershell
+. .github\cdn-cli\scripts\use_aaz_dev_env.ps1
+aaz-dev --version
+```
 
 Environment variables required by `aaz-dev`:
 
 | Env Var | Value | Purpose |
 |---------|-------|---------|
-| `AAZ_SWAGGER_PATH` | `C:\Users\jingnanxu\source\repos\swagger` | azure-rest-api-specs repo |
-| `AAZ_PATH` | `C:\Users\jingnanxu\source\repos\aaz` | AAZ command model registry |
-| `AAZ_CLI_PATH` | `C:\Users\jingnanxu\source\repos\cli` | azure-cli repo (shared context) |
-| `AAZ_CLI_EXTENSION_PATH` | `C:\Users\jingnanxu\source\repos\extension` | azure-cli-extensions repo (primary output) |
+| `AAZ_SWAGGER_PATH` | `<repo-root>\swagger` | azure-rest-api-specs repo |
+| `AAZ_PATH` | `<repo-root>\aaz` | AAZ command model registry |
+| `AAZ_CLI_PATH` | `<repo-root>\cli` | azure-cli repo (shared context) |
+| `AAZ_CLI_EXTENSION_PATH` | `<repo-root>\extension` | azure-cli-extensions repo (primary output) |
 
 **PowerShell activation:**
 
 ```powershell
-# Activate virtual environment
-& C:\Users\jingnanxu\source\repos\azdev\Scripts\Activate.ps1
-
-# Set env vars
-$env:AAZ_SWAGGER_PATH = "C:\Users\jingnanxu\source\repos\swagger"
-$env:AAZ_PATH         = "C:\Users\jingnanxu\source\repos\aaz"
-$env:AAZ_CLI_PATH     = "C:\Users\jingnanxu\source\repos\cli"
-$env:AAZ_CLI_EXTENSION_PATH = "C:\Users\jingnanxu\source\repos\extension"
-
+. .github\cdn-cli\scripts\use_aaz_dev_env.ps1
 aaz-dev --version
 ```
 
@@ -37,11 +65,11 @@ aaz-dev --version
 
 ```powershell
 # CDN/AFD extension
-Set-Location C:\Users\jingnanxu\source\repos\extension\src\cdn
+Set-Location $env:AAZ_CLI_EXTENSION_PATH\src\cdn
 pip install -e .
 
 # Front Door extension
-Set-Location C:\Users\jingnanxu\source\repos\extension\src\front-door
+Set-Location $env:AAZ_CLI_EXTENSION_PATH\src\front-door
 pip install -e .
 ```
 
@@ -52,11 +80,13 @@ pip install -e .
 Launch the web UI with all repo paths wired in:
 
 ```powershell
+. .github\cdn-cli\scripts\use_aaz_dev_env.ps1
+
 aaz-dev run `
-  --swagger-path C:\Users\jingnanxu\source\repos\swagger `
-  --aaz-path     C:\Users\jingnanxu\source\repos\aaz `
-  --cli-path     C:\Users\jingnanxu\source\repos\cli `
-  -e             C:\Users\jingnanxu\source\repos\extension
+  --swagger-path $env:AAZ_SWAGGER_PATH `
+  --aaz-path     $env:AAZ_PATH `
+  --cli-path     $env:AAZ_CLI_PATH `
+  -e             $env:AAZ_CLI_EXTENSION_PATH
 ```
 
 Opens at **http://127.0.0.1:5000**. Workflow:
@@ -69,10 +99,10 @@ After generation, run `git status` in both `extension` and `aaz` to review chang
 **Restart aaz-dev** (e.g. after installing an extension with `pip install -e .`):
 
 ```powershell
-& .github\skills\cdn-cli\scripts\restart_aaz_dev.ps1
+& .github\cdn-cli\scripts\restart_aaz_dev.ps1
 ```
 
-This script kills the existing process on port 5000 and relaunches with all repo paths.
+This script kills the existing process on port 5000, activates the shared venv, and relaunches with repo paths resolved from `AAZ_REPOS_ROOT` or the default repo root.
 
 ---
 
@@ -81,14 +111,16 @@ This script kills the existing process on port 5000 and relaunches with all repo
 Check available swagger tags first:
 
 ```powershell
+$swaggerRoot = $env:AAZ_SWAGGER_PATH
+
 # CDN spec tags
 Select-String `
-  -Path    "C:\Users\jingnanxu\source\repos\swagger\specification\cdn\resource-manager\Microsoft.Cdn\Cdn\readme.md" `
+  -Path    (Join-Path $swaggerRoot "specification\cdn\resource-manager\Microsoft.Cdn\Cdn\readme.md") `
   -Pattern "^### Tag:"
 
 # Front Door spec tags
 Select-String `
-  -Path    "C:\Users\jingnanxu\source\repos\swagger\specification\frontdoor\resource-manager\Microsoft.Network\FrontDoor\readme.md" `
+  -Path    (Join-Path $swaggerRoot "specification\frontdoor\resource-manager\Microsoft.Network\FrontDoor\readme.md") `
   -Pattern "^### Tag:"
 ```
 
@@ -114,26 +146,26 @@ When creating a workspace with many resources, use the script to pre-select corr
 ```powershell
 # Requires aaz-dev web UI running on http://127.0.0.1:5000
 # Must run from the azdev virtual environment:
-& C:\Users\jingnanxu\source\repos\azdev\Scripts\Activate.ps1
+. .github\cdn-cli\scripts\use_aaz_dev_env.ps1
 
 # --- CDN / AFD ---
 
 # Dry run (see what would be selected)
-python .github\skills\cdn-cli\scripts\auto_select_resources.py --ext cdn --version 2025-09-01-preview --dry-run
+python .github\cdn-cli\scripts\auto_select_resources.py --ext cdn --version 2025-09-01-preview --dry-run
 
 # Create workspace with resources
-python .github\skills\cdn-cli\scripts\auto_select_resources.py --ext cdn --version 2025-09-01-preview
+python .github\cdn-cli\scripts\auto_select_resources.py --ext cdn --version 2025-09-01-preview
 
 # Custom workspace name
-python .github\skills\cdn-cli\scripts\auto_select_resources.py --ext cdn --version 2025-09-01-preview --workspace cdn-0901
+python .github\cdn-cli\scripts\auto_select_resources.py --ext cdn --version 2025-09-01-preview --workspace cdn-0901
 
 # --- Front Door ---
 
 # Dry run
-python .github\skills\cdn-cli\scripts\auto_select_resources.py --ext front-door --version 2025-11-01 --dry-run
+python .github\cdn-cli\scripts\auto_select_resources.py --ext front-door --version 2025-11-01 --dry-run
 
 # Create workspace with resources
-python .github\skills\cdn-cli\scripts\auto_select_resources.py --ext front-door --version 2025-11-01
+python .github\cdn-cli\scripts\auto_select_resources.py --ext front-door --version 2025-11-01
 ```
 
 The script:
@@ -148,7 +180,7 @@ The script:
 | Extension | `mod_names` | `rp_name` | Swagger module | Workspace prefix |
 |-----------|-------------|-----------|----------------|-----------------|
 | `cdn` | `cdn` | `Microsoft.Cdn` | `cdn` | `cdn-` |
-| `front-door` | `front-door` | `Microsoft.Network` | `frontdoor` | `front-door-` |
+| `front-door` | `frontdoor` | `Microsoft.Network` | `frontdoor` | `front-door-` |
 
 **Adding new resources not in AAZ** (e.g. a new operation added in the swagger):
 
@@ -179,15 +211,15 @@ Complete steps to upgrade an extension from one API version to another.
 ### Prerequisites
 
 - `aaz-dev` running: `aaz-dev run --swagger-path ... --aaz-path ... --cli-path ... -e ...`
-- Virtual environment activated: `& C:\Users\jingnanxu\source\repos\azdev\Scripts\Activate.ps1`
+- Virtual environment activated: `. .github\cdn-cli\scripts\use_aaz_dev_env.ps1`
 - Local `azure-rest-api-specs` repo up to date with the new swagger version
 - **Extension installed in azdev venv** (required for Web UI features like Add Example):
   ```powershell
   # Install if not already done — then restart aaz-dev
-  Set-Location C:\Users\jingnanxu\source\repos\extension\src\front-door
+  Set-Location $env:AAZ_CLI_EXTENSION_PATH\src\front-door
   pip install -e .
   # or for CDN:
-  Set-Location C:\Users\jingnanxu\source\repos\extension\src\cdn
+  Set-Location $env:AAZ_CLI_EXTENSION_PATH\src\cdn
   pip install -e .
   ```
 
@@ -197,29 +229,50 @@ Create feature branches in both the `extension` and `aaz` repos before making an
 
 ```powershell
 # Branch in extension repo
-Set-Location C:\Users\jingnanxu\source\repos\extension
+Set-Location $env:AAZ_CLI_EXTENSION_PATH
 git checkout -b <branch-name>   # e.g. front-door-2025-11-01, cdn-2025-09-01-preview
 
 # Branch in aaz repo (Export writes here)
-Set-Location C:\Users\jingnanxu\source\repos\aaz
+Set-Location $env:AAZ_PATH
 git checkout -b <branch-name>
 ```
 
 ### Step 2: Compare swagger versions (Copilot)
 
-Ask Copilot to diff the old vs new swagger. Provide the new swagger URL or local path. Key areas:
-- New/removed operations, new enum values, new models
+Run the swagger diff script to compare old vs new versions:
+
+```powershell
+# Front Door example
+python .github\cdn-cli\scripts\swagger_diff.py --ext front-door --old <old-version> --new <new-version>
+
+# CDN example
+python .github\cdn-cli\scripts\swagger_diff.py --ext cdn --old <old-version> --new <new-version>
+```
+
+The script parses the swagger `readme.md`, loads all JSON files for each tag, and reports:
+- New/removed/modified operations
+- New/removed/modified models and properties
+- Enum value changes
+- Breaking changes summary
+
+Review the output before proceeding. Key areas to watch:
 - LRO pattern changes (`final-state-via`)
 - Breaking changes (removed fields, renamed properties)
+
+To find the current API version in use, grep the AAZ-generated files:
+```powershell
+Get-ChildItem -Path "$env:AAZ_CLI_EXTENSION_PATH\src\front-door\azext_front_door\aaz\latest\" -Recurse -Filter "*.py" |
+  Select-String -Pattern "api-version" | Select-Object -Property Line -Unique
+```
 
 ### Step 3: Create workspace with auto-select script (Copilot)
 
 ```powershell
 # CDN example:
-python .github\skills\cdn-cli\scripts\auto_select_resources.py --ext cdn --version <new-version>
+python .github\cdn-cli\scripts\auto_select_resources.py --ext cdn --version <new-version>
 
 # Front Door example:
-python .github\skills\cdn-cli\scripts\auto_select_resources.py --ext front-door --version <new-version>
+python .github\cdn-cli\scripts\auto_select_resources.py --ext front-door --version <new-version>
 ```
 
 The script creates a workspace, adds resources with inheritance, and generates swagger examples automatically.
@@ -264,7 +317,7 @@ git diff --stat src/front-door/   # or src/cdn/
 git diff src/front-door/
 
 # Check aaz repo changes
-Set-Location C:\Users\jingnanxu\source\repos\aaz
+Set-Location $env:AAZ_PATH
 git status; git diff --stat
 ```
 
@@ -313,7 +366,7 @@ Commit changes in both `extension` and `aaz` repos on the feature branch.
 ```powershell
 # Extension repo — commit AAZ code + WAF recordings + version bump + changelog
 # Do NOT commit legacy test recordings (backend-pool, frontend-endpoint, etc.)
-Set-Location C:\Users\jingnanxu\source\repos\extension
+Set-Location $env:AAZ_CLI_EXTENSION_PATH
 git add src/front-door/azext_front_door/aaz/
 git add src/front-door/azext_front_door/tests/latest/recordings/test_waf_*.yaml
 git add src/front-door/setup.py
@@ -321,7 +374,7 @@ git add src/front-door/HISTORY.rst
 git commit -m "Upgrade front-door WAF policy commands to API version <version>"
 
 # AAZ repo — commit all changes (hook will auto-verify command models)
-Set-Location C:\Users\jingnanxu\source\repos\aaz
+Set-Location $env:AAZ_PATH
 git add -A
 git commit -m "Upgrade front-door WAF policy command models to <version>"
 ```
