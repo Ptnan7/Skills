@@ -4,15 +4,43 @@ Before updating a module, compare the old and new swagger to understand which AP
 
 ---
 
+## Quick Diff with Script (Preferred)
+
+Use the shared diff script (from `cdn-cli`). Requires `AAZ_SWAGGER_PATH` (set by `use_pwsh_env.ps1`).
+
+```powershell
+. .github\cdn-pwsh\scripts\use_pwsh_env.ps1
+
+# CDN / AFD module
+python .github\cdn-cli\scripts\swagger_diff.py --ext cdn --old <old-version> --new <new-version>
+
+# Front Door WAF (if needed)
+python .github\cdn-cli\scripts\swagger_diff.py --ext front-door --old <old-version> --new <new-version>
+```
+
+The script parses the swagger `readme.md`, loads all JSON files for each tag, and reports:
+- New/removed/modified operations
+- New/removed/modified models and properties
+- Enum value changes
+- Breaking changes summary
+
+**Wait for the user to acknowledge the diff** before proceeding with code changes.
+
+---
+
 ## Locate the Current Version
 
 Read the module's `.Autorest/README.md` and extract:
 - The existing API version string (e.g. `2024-02-01`)
 - Whether it is `stable` or `preview`
 
+```powershell
+Select-String -Path "$env:PWSH_REPO_PATH\src\Cdn\Cdn.Autorest\README.md" -Pattern "api-version|stable/|preview/"
+```
+
 ---
 
-## Determine the Swagger Source
+## Manual Diff (Alternative)
 
 Ask the user if not already stated:
 

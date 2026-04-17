@@ -2,12 +2,13 @@
 
 ## Repository
 
-The CDN PowerShell module lives in the `azure-powershell` repo. The AutoRest project is at:
+The CDN PowerShell module lives in the `azure-powershell` repo, cloned as `pwsh` by the init script. Use `$env:PWSH_REPO_PATH` (set by `use_pwsh_env.ps1`) to reference it. The AutoRest project is at:
 
 ```
-src/
-  Cdn/
-    Cdn.Autorest/        ← AutoRest project root (work here)
+$env:PWSH_REPO_PATH\
+  src\
+    Cdn\
+      Cdn.Autorest\        ← AutoRest project root (work here)
       README.md          ← AutoRest config: input swagger, directives, version
       exports/           ← Generated public cmdlets (.ps1)
       generated/         ← Generated internal C# code (do not edit)

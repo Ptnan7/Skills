@@ -11,9 +11,12 @@ Supports two extensions:
 Usage:
     python swagger_diff.py --ext front-door --old 2025-10-01 --new 2025-11-01
     python swagger_diff.py --ext cdn --old 2024-02-01 --new 2025-09-01-preview
+    python swagger_diff.py --ext cdn --old 2024-02-01 --new 2025-09-01-preview --swagger-path C:\repos\azure-rest-api-specs
 
-Requires: AAZ_SWAGGER_PATH environment variable pointing to a local
-          azure-rest-api-specs clone.
+Swagger repo resolution order:
+  1. --swagger-path CLI argument
+  2. AAZ_SWAGGER_PATH environment variable
+  3. AAZ_REPOS_ROOT/swagger (fallback)
 """
 
 import argparse
@@ -34,17 +37,20 @@ EXTENSION_PROFILES = {
 }
 
 
-def get_swagger_root():
-    """Get swagger repo root from env or default."""
-    root = os.environ.get("AAZ_SWAGGER_PATH")
+def get_swagger_root(swagger_path_arg=None):
+    """Get swagger repo root from CLI arg, env, or default."""
+    root = swagger_path_arg
     if not root:
-        # Fallback: try repo root detection
+        root = os.environ.get("AAZ_SWAGGER_PATH")
+    if not root:
         repo_root = os.environ.get("AAZ_REPOS_ROOT")
         if repo_root:
             root = os.path.join(repo_root, "swagger")
     if not root or not os.path.isdir(root):
-        print("ERROR: AAZ_SWAGGER_PATH not set or not a valid directory.", file=sys.stderr)
-        print("Run: . .github\\cdn-cli\\scripts\\use_aaz_dev_env.ps1", file=sys.stderr)
+        print("ERROR: Swagger repo not found.", file=sys.stderr)
+        print("  Use --swagger-path <path>, or set AAZ_SWAGGER_PATH, or run:", file=sys.stderr)
+        print("    . .github\\cdn-cli\\scripts\\use_aaz_dev_env.ps1", file=sys.stderr)
+        print("    . .github\\cdn-pwsh\\scripts\\use_pwsh_env.ps1", file=sys.stderr)
         sys.exit(1)
     return root
 
@@ -72,29 +78,39 @@ def parse_readme_tags(readme_path):
 
 
 def version_to_tag(version, tags):
-    """Find the tag name that matches a version string like '2025-11-01'."""
-    # Try exact patterns: package-YYYY-MM, package-preview-YYYY-MM, package-YYYY-MM-DD
+    """Find the tag name that matches a version string like '2025-11-01' or '2025-09-01-preview'."""
     version_parts = version.split("-")
+    year_month = f"{version_parts[0]}-{version_parts[1]}" if len(version_parts) >= 2 else version
+    is_preview = "preview" in version
 
-    # For preview versions like 2025-09-01-preview
-    if "preview" in version:
-        candidates = [
-            f"package-preview-{version_parts[0]}-{version_parts[1]}",
-            f"package-{version}",
-        ]
+    # Build candidate list in priority order
+    candidates = []
+    if is_preview:
+        # e.g. package-preview-2025-09, package-2025-09-01-preview
+        candidates.append(f"package-preview-{year_month}")
+        candidates.append(f"package-{version}")
     else:
-        candidates = [
-            f"package-{version_parts[0]}-{version_parts[1]}",
-            f"package-{version}",
-        ]
+        # e.g. package-2025-11, package-2025-11-01
+        candidates.append(f"package-{year_month}")
+        candidates.append(f"package-{version}")
 
     for candidate in candidates:
         if candidate in tags:
             return candidate
 
-    # Fallback: search for version substring in tag names
+    # Fallback: find tags containing the version substring or year-month
+    # Prefer tags that also match the preview/stable nature
     for tag_name in tags:
-        if version_parts[0] in tag_name and version_parts[1] in tag_name:
+        tag_lower = tag_name.lower()
+        tag_is_preview = "preview" in tag_lower
+        if tag_is_preview != is_preview:
+            continue
+        if year_month in tag_name:
+            return tag_name
+
+    # Last resort: any tag containing year-month
+    for tag_name in tags:
+        if year_month in tag_name:
             return tag_name
 
     return None
@@ -323,11 +339,13 @@ def main():
     parser.add_argument("--ext", required=True, choices=list(EXTENSION_PROFILES.keys()),
                         help="Extension to compare (cdn or front-door)")
     parser.add_argument("--old", required=True, help="Old API version (e.g. 2025-10-01)")
-    parser.add_argument("--new", required=True, help="New API version (e.g. 2025-11-01)")
+    parser.add_argument("--new", required=True, help="New API version (e.g. 2025-11-01, 2025-09-01-preview)")
+    parser.add_argument("--swagger-path", default=None,
+                        help="Local path to azure-rest-api-specs clone (overrides AAZ_SWAGGER_PATH)")
     args = parser.parse_args()
 
     profile = EXTENSION_PROFILES[args.ext]
-    swagger_root = get_swagger_root()
+    swagger_root = get_swagger_root(args.swagger_path)
     spec_dir = os.path.join(swagger_root, "specification", profile["readme_path"])
     readme_path = os.path.join(spec_dir, "readme.md")
 
