@@ -278,34 +278,68 @@ python .github\cdn-cli\scripts\auto_select_resources.py --ext front-door --versi
 The script creates a workspace, adds resources with inheritance, and generates swagger examples automatically.
 If the new swagger adds new resources/operations not in AAZ, add them to the workspace (see "Adding new resources" above).
 
-### Step 4: Review and export workspace (Manual — Web UI)
+### Step 4: Review and export workspace (Manual or Copilot)
 
+Option A — **Web UI** (manual):
 1. Open **http://127.0.0.1:5000**
 2. Select the workspace (e.g. `front-door-2025-11-01`)
 3. Review the command tree — verify commands, arguments, naming, and examples
 4. Click **Export** to commit the command models (with examples) to the `aaz` repo
 5. **Tell the agent** "已 Export" to proceed to CLI generation
 
+Option B — **API** (Copilot can do this automatically):
+```python
+requests.post("http://127.0.0.1:5000/AAZ/Editor/Workspaces/<ws-name>/Generate")
+```
+This is equivalent to clicking Export in the Web UI — it writes command models and examples to the `aaz` repo.
+
 > **Export must happen before CLI generation.** The Export writes examples into the `aaz` repo. CLI generation reads from `aaz`, so examples are only preserved if Export runs first.
 
 ### Step 5: Generate CLI code (Copilot)
 
-After the user confirms Export is done, **first verify the aaz repo has changes** then generate:
+After Export is done, **first verify the aaz repo has changes** then generate:
 
 ```python
-# 0. Verify Export happened — check aaz repo for uncommitted changes
+import requests
+
+BASE_URL = "http://127.0.0.1:5000"
+EXT_NAME = "front-door"   # or "cdn"
+NEW_VERSION = "2025-11-01" # target version
+
+# 0. Export workspace (writes command models + examples to aaz repo)
+requests.post(f"{BASE_URL}/AAZ/Editor/Workspaces/<ws-name>/Generate")
+
+# 1. Verify Export happened — check aaz repo for uncommitted changes
 #    Run: git status --short  in the aaz repo
 #    If no changes → Export was not done, ask user to Export first
 
-# 1. Read current CLI module, update all command versions, PUT back
-data = requests.get("http://127.0.0.1:5000/CLI/Az/Extension/Modules/<ext-name>").json()
-# ... update data['profiles']['latest'] command versions to new version ...
-requests.put("http://127.0.0.1:5000/CLI/Az/Extension/Modules/<ext-name>", json=data)
+# 2. Read current CLI module
+data = requests.get(f"{BASE_URL}/CLI/Az/Extension/Modules/{EXT_NAME}").json()
+
+# 3. Update all command versions in data['profiles']['latest']
+#    The structure is nested commandGroups → commands → each has a "version" string field.
+#    Also check commandGroups that have a "waitCommand" dict with a "version" field.
+#    Walk recursively:
+def update_versions(node):
+    if "commandGroups" in node:
+        for group in node["commandGroups"].values():
+            update_versions(group)
+    if "commands" in node:
+        for cmd in node["commands"].values():
+            if "version" in cmd:
+                cmd["version"] = NEW_VERSION
+    if "waitCommand" in node and "version" in node["waitCommand"]:
+        node["waitCommand"]["version"] = NEW_VERSION
+
+update_versions(data["profiles"]["latest"])
+
+# 4. PUT back — this triggers CLI code generation
+requests.put(f"{BASE_URL}/CLI/Az/Extension/Modules/{EXT_NAME}", json=data)
 ```
 
-This is safe because Export (Step 4) already wrote examples to `aaz`. The PUT reads examples from `aaz` when generating code.
+This is safe because Export already wrote examples to `aaz`. The PUT reads examples from `aaz` when generating code.
 
-> **Key constraint**: Always Export workspace FIRST (manual), then Generate CLI (automated). If you skip Export, examples will be lost.
+> **Key constraint**: Always Export workspace FIRST, then Generate CLI. If you skip Export, examples will be lost.
 
 ### Step 6: Review generated changes (Manual, then tell agent)
 
@@ -322,6 +356,12 @@ git status; git diff --stat
 ```
 
 ### Step 7: Run tests (Copilot — after user confirms review)
+
+**Prerequisite**: `azdev setup` must have been run to register CLI and extension repos. If `azdev test` fails with `Unable to retrieve CLI repo path from config`, run:
+```powershell
+azdev setup -c cli -r extension
+```
+This only needs to be done once per venv (it persists across terminal sessions).
 
 Run only the relevant tests (WAF for front-door, or specific test files for cdn). Legacy front-door tests (backend-pool, frontend-endpoint, routing-rule, etc.) are not maintained and may fail — ignore those.
 

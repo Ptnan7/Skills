@@ -13,7 +13,7 @@ param(
     [string]$RepoRoot,
     [string]$VenvName = "azdev",
     [int]$Port = 5000,
-    [string]$Host = "127.0.0.1"
+    [string]$ListenHost = "127.0.0.1"
 )
 
 $ErrorActionPreference = "Stop"
@@ -53,7 +53,7 @@ foreach ($requiredPath in @($context.SwaggerPath, $context.AazPath, $context.Cli
     }
 }
 
-Write-Host "Starting aaz-dev on http://${Host}:${Port} ..."
+Write-Host "Starting aaz-dev on http://${ListenHost}:${Port} ..."
 aaz-dev run `
     --swagger-path $context.SwaggerPath `
     --aaz-path     $context.AazPath `
