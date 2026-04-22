@@ -104,7 +104,7 @@ Common valid fixes:
 After a successful build, **ask the user whether to run unit tests**. Do not run tests automatically.
 
 1. Inform the user the build succeeded and ask: "Build succeeded. Would you like to run the unit tests?"
-2. If the user confirms, run `pwsh -File ./test-module.ps1 -Playback` from the `.Autorest/` directory.
+2. If the user confirms, run `pwsh -File ./test-module.ps1 -Record` from the `.Autorest/` directory. Use `-Record` (not `-Playback`) to execute live tests against Azure and update the test recordings.
 3. If tests fail, analyze the failures and propose fixes (scoped to the module directory).
 4. If the user declines, skip to the next step.
 

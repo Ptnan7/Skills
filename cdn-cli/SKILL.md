@@ -34,5 +34,5 @@ When user asks to upgrade a swagger version, follow the workflow in [aaz-dev-set
 5. **Diff swagger** — run `python .github\cdn-cli\scripts\swagger_diff.py --ext <cdn|front-door> --old <old-ver> --new <new-ver>` to compare versions (Copilot). See [swagger-diff.md](references/swagger-diff.md)
 6. **Create workspace** — run `.github\cdn-cli\scripts\auto_select_resources.py --ext <cdn|front-door> --version <ver>` (Copilot)
 7. **Export workspace** — **Manual** in Web UI (user clicks Export). Wait for user to confirm.
-8. **Generate CLI** — After user confirms Export, agent calls API to update versions and generate code (Copilot)
+8. **Generate CLI** — After user confirms Export, run `python .github\cdn-cli\scripts\generate_cli.py --ext <cdn|front-door> --version <ver>` (Copilot)
 9. **Review & test** — `git diff`, bump version, `azdev linter`, `azdev test` (Copilot or manual)

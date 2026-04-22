@@ -233,6 +233,11 @@ def generate_examples_for_workspace(ws_name):
     This loads x-ms-examples from the swagger spec into the workspace commands.
     Requires the CLI extension to be installed (pip install -e) and aaz-dev
     running from the azdev venv.
+
+    Also fixes common swagger example issues:
+    - CreateOrUpdate operations share one example across 'create' and 'update'
+      commands, so 'update' commands may inherit a "Creates ..." example name.
+      The script rewrites these to "Updates ..." automatically.
     """
     r = requests.get(f"{BASE_URL}/AAZ/Editor/Workspaces/{ws_name}")
     if r.status_code != 200:
@@ -253,6 +258,18 @@ def generate_examples_for_workspace(ws_name):
         if r.status_code == 200:
             examples = r.json()
             if examples:
+                # Fix misleading example names for update commands.
+                # Swagger CreateOrUpdate operations produce one example that is
+                # shared by both the 'create' and 'update' AAZ commands.  The
+                # example name often starts with "Create" which is wrong for
+                # the update command.
+                if leaf_name == "update":
+                    for ex in examples:
+                        name = ex.get("name", "")
+                        if name.lower().startswith("create"):
+                            fixed = "Update" + name[len("Create"):]
+                            ex["name"] = fixed
+
                 # Patch examples into the command
                 patch_url = (
                     f"{BASE_URL}/AAZ/Editor/Workspaces/{ws_name}"
@@ -264,7 +281,7 @@ def generate_examples_for_workspace(ws_name):
                     print(f"    {grp_path}/{leaf_name}: {ex_names}")
                     count += 1
                 else:
-                    print(f"    {cmd_path}: patch failed ({r2.status_code})")
+                    print(f"    {grp_path}/{leaf_name}: patch failed ({r2.status_code})")
                     errors += 1
         else:
             # 404 = module not installed, 400 = no operations

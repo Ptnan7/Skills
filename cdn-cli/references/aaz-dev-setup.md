@@ -36,7 +36,14 @@ One-time bootstrap:
 & .github\cdn-cli\scripts\initialize_aaz_dev_env.ps1 -PersistUserRepoRoot
 ```
 
-If the virtual environment or any of the four repos (`extension`, `swagger`, `aaz`, `cli`) is missing, the script creates the missing pieces automatically before continuing.
+If the venv or any of the four repos (`extension`, `swagger`, `aaz`, `cli`) is missing, the bootstrap script creates the missing pieces.
+
+To verify the four repos exist **without** triggering a clone or venv activation:
+
+```powershell
+& .github\cdn-cli\scripts\check_repos.ps1        # human-readable output
+& .github\cdn-cli\scripts\check_repos.ps1 -Quiet # exit code only (0 ok, 1 missing)
+```
 
 For every new PowerShell terminal:
 
@@ -77,16 +84,10 @@ pip install -e .
 
 ## Code Generation — Preferred Path (Web UI)
 
-Launch the web UI with all repo paths wired in:
+Launch (or relaunch) the web UI — activates the venv, verifies the four repos, frees port 5000, and starts `aaz-dev run` with all paths wired in:
 
 ```powershell
-. .github\cdn-cli\scripts\use_aaz_dev_env.ps1
-
-aaz-dev run `
-  --swagger-path $env:AAZ_SWAGGER_PATH `
-  --aaz-path     $env:AAZ_PATH `
-  --cli-path     $env:AAZ_CLI_PATH `
-  -e             $env:AAZ_CLI_EXTENSION_PATH
+& .github\cdn-cli\scripts\restart_aaz_dev.ps1
 ```
 
 Opens at **http://127.0.0.1:5000**. Workflow:
@@ -96,13 +97,7 @@ Opens at **http://127.0.0.1:5000**. Workflow:
 
 After generation, run `git status` in both `extension` and `aaz` to review changes.
 
-**Restart aaz-dev** (e.g. after installing an extension with `pip install -e .`):
-
-```powershell
-& .github\cdn-cli\scripts\restart_aaz_dev.ps1
-```
-
-This script kills the existing process on port 5000, activates the shared venv, and relaunches with repo paths resolved from `AAZ_REPOS_ROOT` or the default repo root.
+Re-run the same `restart_aaz_dev.ps1` after installing an extension with `pip install -e .` to pick up the new code.
 
 ---
 
@@ -210,7 +205,7 @@ Complete steps to upgrade an extension from one API version to another.
 
 ### Prerequisites
 
-- `aaz-dev` running: `aaz-dev run --swagger-path ... --aaz-path ... --cli-path ... -e ...`
+- `aaz-dev` running: `& .github\cdn-cli\scripts\restart_aaz_dev.ps1`
 - Virtual environment activated: `. .github\cdn-cli\scripts\use_aaz_dev_env.ps1`
 - Local `azure-rest-api-specs` repo up to date with the new swagger version
 - **Extension installed in azdev venv** (required for Web UI features like Add Example):
@@ -276,6 +271,7 @@ python .github\cdn-cli\scripts\auto_select_resources.py --ext front-door --versi
 ```
 
 The script creates a workspace, adds resources with inheritance, and generates swagger examples automatically.
+The script also auto-fixes common swagger example issues (e.g. `update` commands inheriting a "Creates ..." example name from the shared `CreateOrUpdate` swagger operation — these are rewritten to "Updates ...").
 If the new swagger adds new resources/operations not in AAZ, add them to the workspace (see "Adding new resources" above).
 
 ### Step 4: Review and export workspace (Manual or Copilot)
@@ -287,59 +283,37 @@ Option A — **Web UI** (manual):
 4. Click **Export** to commit the command models (with examples) to the `aaz` repo
 5. **Tell the agent** "已 Export" to proceed to CLI generation
 
-Option B — **API** (Copilot can do this automatically):
+Option B — **API** (Copilot can do this automatically). Use `generate_cli.py --workspace <ws-name>` to Export and generate in a single call (see Step 5). To Export only, without generating, call the Generate endpoint directly:
+
 ```python
 requests.post("http://127.0.0.1:5000/AAZ/Editor/Workspaces/<ws-name>/Generate")
 ```
+
 This is equivalent to clicking Export in the Web UI — it writes command models and examples to the `aaz` repo.
 
 > **Export must happen before CLI generation.** The Export writes examples into the `aaz` repo. CLI generation reads from `aaz`, so examples are only preserved if Export runs first.
 
 ### Step 5: Generate CLI code (Copilot)
 
-After Export is done, **first verify the aaz repo has changes** then generate:
+After Export is done, **first verify the aaz repo has changes** (`git -C $env:AAZ_PATH status --short` must be non-empty), then generate. The script walks `profiles.latest`, bumps every `command.version` and `waitCommand.version` to the target, and PUTs the module back — which triggers CLI code generation.
 
-```python
-import requests
+```powershell
+# Front Door
+python .github\cdn-cli\scripts\generate_cli.py --ext front-door --version 2025-11-01
 
-BASE_URL = "http://127.0.0.1:5000"
-EXT_NAME = "front-door"   # or "cdn"
-NEW_VERSION = "2025-11-01" # target version
+# CDN / AFD
+python .github\cdn-cli\scripts\generate_cli.py --ext cdn --version 2025-09-01-preview
 
-# 0. Export workspace (writes command models + examples to aaz repo)
-requests.post(f"{BASE_URL}/AAZ/Editor/Workspaces/<ws-name>/Generate")
+# Optional: Export the workspace first (same as clicking Export in Web UI), then generate
+python .github\cdn-cli\scripts\generate_cli.py --ext front-door --version 2025-11-01 --workspace front-door-2025-11-01
 
-# 1. Verify Export happened — check aaz repo for uncommitted changes
-#    Run: git status --short  in the aaz repo
-#    If no changes → Export was not done, ask user to Export first
-
-# 2. Read current CLI module
-data = requests.get(f"{BASE_URL}/CLI/Az/Extension/Modules/{EXT_NAME}").json()
-
-# 3. Update all command versions in data['profiles']['latest']
-#    The structure is nested commandGroups → commands → each has a "version" string field.
-#    Also check commandGroups that have a "waitCommand" dict with a "version" field.
-#    Walk recursively:
-def update_versions(node):
-    if "commandGroups" in node:
-        for group in node["commandGroups"].values():
-            update_versions(group)
-    if "commands" in node:
-        for cmd in node["commands"].values():
-            if "version" in cmd:
-                cmd["version"] = NEW_VERSION
-    if "waitCommand" in node and "version" in node["waitCommand"]:
-        node["waitCommand"]["version"] = NEW_VERSION
-
-update_versions(data["profiles"]["latest"])
-
-# 4. PUT back — this triggers CLI code generation
-requests.put(f"{BASE_URL}/CLI/Az/Extension/Modules/{EXT_NAME}", json=data)
+# Dry run — show what would change without PUTing
+python .github\cdn-cli\scripts\generate_cli.py --ext cdn --version 2025-09-01-preview --dry-run
 ```
 
 This is safe because Export already wrote examples to `aaz`. The PUT reads examples from `aaz` when generating code.
 
-> **Key constraint**: Always Export workspace FIRST, then Generate CLI. If you skip Export, examples will be lost.
+> **Key constraint**: Always Export workspace FIRST, then Generate CLI. If you skip Export, examples will be lost. `--workspace` does the Export as part of the same command.
 
 ### Step 6: Review generated changes (Manual, then tell agent)
 
@@ -354,6 +328,14 @@ git diff src/front-door/
 Set-Location $env:AAZ_PATH
 git status; git diff --stat
 ```
+
+**Common issues to look for in generated code:**
+
+| Issue | Where to check | Fix |
+|-------|---------------|-----|
+| `update` command example says "Creates ..." | `:example:` docstring in `_update.py` | Change to "Updates ..." — swagger `CreateOrUpdate` shares one example across `create`/`update` |
+| Example name doesn't match command semantics | `:example:` docstrings in all generated `*.py` | Manually correct; `auto_select_resources.py` auto-fixes common cases but not all |
+| Missing examples | commands with no `:example:` | Add via Web UI or manually in the docstring |
 
 ### Step 7: Run tests (Copilot — after user confirms review)
 
@@ -378,26 +360,26 @@ azdev linter front-door   # or cdn
 
 ### Step 8: Update extension version and changelog (Copilot)
 
-Bump the version in `setup.py` and add a changelog entry in `HISTORY.rst`.
+Bump `setup.py` `VERSION` and prepend a `HISTORY.rst` entry. Supports both extensions and is idempotent (safe to re-run):
 
-```python
-# setup.py — bump VERSION (minor for new features, patch for bugfixes)
-VERSION = "X.Y.Z"
+```powershell
+# Front Door
+python .github\cdn-cli\scripts\update_history.py --ext front-door --version 2.3.0 `
+    --swagger-version 2025-11-01 `
+    --message "Add support for managed rule set exceptions" `
+    --message "Add new enum values: JA4 (MatchVariable), AsnMatch and ClientFingerprint (Operator)"
 
-# HISTORY.rst — prepend new entry at the top (after the header)
-# Format:
-# X.Y.Z
-# ++++++
-# * Brief description of changes
+# CDN / AFD
+python .github\cdn-cli\scripts\update_history.py --ext cdn --version 3.1.0 `
+    --swagger-version 2025-09-01-preview `
+    --message "Describe the user-facing change here"
+
+# Preview only
+python .github\cdn-cli\scripts\update_history.py --ext front-door --version 2.3.0 `
+    --swagger-version 2025-11-01 --dry-run
 ```
 
-Example for front-door:
-- `setup.py`: `VERSION = "2.1.0"` → `"2.2.0"`
-- `HISTORY.rst`: Add entry describing the swagger upgrade and new features
-
-Example for cdn:
-- `setup.py` at `src/cdn/setup.py`
-- `HISTORY.rst` at `src/cdn/HISTORY.rst`
+The script writes to `extension/src/<ext>/setup.py` and `extension/src/<ext>/HISTORY.rst`. Version bump policy: **minor** for new features, **patch** for bugfixes.
 
 ### Step 9: Commit to both repos (Copilot)
 

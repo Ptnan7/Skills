@@ -35,8 +35,8 @@ This sets `$env:PWSH_REPO_PATH` and `$env:AAZ_SWAGGER_PATH` for scripts and comm
 5. **Run autorest** — `autorest` from the `.Autorest/` directory
 6. **Review custom code** — check if `custom/` files reference changed models, renamed properties, or removed types from the swagger diff. Present findings to the user and wait for approval before editing. See [autorest-generation.md](references/autorest-generation.md) Step 3.
 7. **Build module** — `pwsh -File ./build-module.ps1`
-8. **Identify changes** — check new/removed cmdlets (see [development.md](references/development.md))
-9. **Test** — ask the user whether to run tests. If yes, run `pwsh -File ./test-module.ps1 -Playback` (see [testing.md](references/testing.md))
+8. **Identify changes** — run `.github\cdn-pwsh\scripts\analyze_module.ps1 -Module <Name>` for new/removed cmdlets + unfilled example placeholders (see [development.md](references/development.md))
+9. **Test** — ask the user whether to run tests. If yes, run `pwsh -File ./test-module.ps1 -Record` to execute live tests and update recordings (see [testing.md](references/testing.md))
 10. **Commit** — if tests pass (or were skipped), ask the user whether to commit. If yes, stage and commit changes in the `pwsh` repo.
 
 ## Reference Files
