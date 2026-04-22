@@ -43,6 +43,7 @@ This sets `$env:PWSH_REPO_PATH` and `$env:AAZ_SWAGGER_PATH` for scripts and comm
 
 | File | Contents |
 |------|----------|
+| [workflow-diagram.md](references/workflow-diagram.md) | Mermaid flowchart of the full module-maintenance workflow |
 | [architecture.md](references/architecture.md) | Module location, directory structure, key commands |
 | [swagger-diff.md](references/swagger-diff.md) | Compare old vs new swagger (local or GitHub) before updating |
 | [autorest-generation.md](references/autorest-generation.md) | Update README.md config, run autorest, build module, error-fixing rules |

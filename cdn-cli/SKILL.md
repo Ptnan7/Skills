@@ -17,6 +17,7 @@ This skill covers two extensions in the `azure-cli-extensions` repo:
 
 | File | Contents |
 |------|----------|
+| [workflow-diagram.md](references/workflow-diagram.md) | Mermaid flowchart of the full swagger-upgrade workflow |
 | [architecture.md](references/architecture.md) | Project structure, command groups, SDK dependencies |
 | [aaz-dev-setup.md](references/aaz-dev-setup.md) | Local environment, code generation, auto-select script, **swagger upgrade workflow** |
 | [swagger-diff.md](references/swagger-diff.md) | Compare old vs new swagger (local or GitHub) before updating AAZ code |
