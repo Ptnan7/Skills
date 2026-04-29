@@ -33,7 +33,15 @@ When user asks to upgrade a swagger version, follow the workflow in [aaz-dev-set
 3. **Activate environment** — run `.github\cdn-cli\scripts\use_aaz_dev_env.ps1` in every new terminal before Python or `aaz-dev` commands (Copilot or manual)
 4. **Create branches** — `git checkout -b <branch>` in both `extension` and `aaz` repos (Copilot)
 5. **Diff swagger** — run `python .github\cdn-cli\scripts\swagger_diff.py --ext <cdn|front-door> --old <old-ver> --new <new-ver>` to compare versions (Copilot). See [swagger-diff.md](references/swagger-diff.md)
-6. **Create workspace** — run `.github\cdn-cli\scripts\auto_select_resources.py --ext <cdn|front-door> --version <ver>` (Copilot)
-7. **Export workspace** — **Manual** in Web UI (user clicks Export). Wait for user to confirm.
-8. **Generate CLI** — After user confirms Export, run `python .github\cdn-cli\scripts\generate_cli.py --ext <cdn|front-door> --version <ver>` (Copilot)
-9. **Review & test** — `git diff`, bump version, `azdev linter`, `azdev test` (Copilot or manual)
+6. **Create workspace** — run `.github\cdn-cli\scripts\auto_select_resources.py --ext <cdn|front-door> --version <ver>` (Copilot). After resources/examples are ready, the script asks whether to Export AAZ and Generate CLI automatically. Use `--auto-export` to answer yes non-interactively, or `--no-auto-export` to review/export manually.
+7. **Export + Generate CLI** — If the user answers yes (or `--auto-export` is used), `auto_select_resources.py` exports the workspace to `aaz` and generates extension CLI code. If the user answers no, export manually in Web UI, then run `python .github\cdn-cli\scripts\generate_cli.py --ext <cdn|front-door> --version <ver>`. After generation, the script asks whether to run tests and linter; use `--run-checks` for non-interactive yes or `--no-run-checks` to skip.
+8. **Review & test** — `git diff`, bump version, `azdev linter`, `azdev test` (Copilot or manual)
+
+## Agent Workflow Requirements
+
+These are required agent behaviors, even if the helper scripts are not used:
+
+- After adding resources to an AAZ workspace, ask the user whether to automatically **Export AAZ and Generate CLI**. If yes, export the workspace before generating CLI. If no, stop at workspace review and wait for manual Export confirmation.
+- After generating CLI code, ask the user whether to run the relevant tests and linter. If yes, run `azdev test test_waf_scenarios` + `azdev linter front-door` for `front-door`, or `azdev test cdn` + `azdev linter cdn` for `cdn`.
+- When using non-interactive scripts, prefer `--auto-export` to automatically export/generate and `--run-checks` to automatically run tests/linter. Use `--no-auto-export` and `--no-run-checks` only when the user wants manual review.
+- Before Export or CLI generation, ensure generated command/group short summaries are filled and misleading update examples such as `Creates ...` are corrected to `Updates ...`.

@@ -24,13 +24,38 @@ Usage:
 """
 
 import argparse
+import os
+import re
+import shutil
+import subprocess
 import sys
+from pathlib import Path
 
 import requests
 
 BASE_URL = "http://127.0.0.1:5000"
 
 SUPPORTED_EXTS = ("cdn", "front-door")
+
+TEST_TARGETS = {
+    "cdn": "cdn",
+    "front-door": "test_waf_scenarios",
+}
+
+EXTENSION_AAZ_PATHS = {
+    "cdn": ["src/cdn/azext_cdn/aaz/latest"],
+    "front-door": ["src/front-door/azext_front_door/aaz/latest"],
+}
+
+COMMAND_MODEL_PATHS = {
+    "cdn": ["Commands/cdn", "Commands/afd"],
+    "front-door": ["Commands/network/front-door"],
+}
+
+UPDATE_EXAMPLE_PATTERNS = {
+    ".py": re.compile(r"(?P<prefix>\s*:example:\s+)(?P<verb>Creates?|creates?)(?P<rest>\b.*)"),
+    ".md": re.compile(r"(?P<prefix>\s*-\s+)(?P<verb>Creates?|creates?)(?P<rest>\b.*)"),
+}
 
 
 def export_workspace(workspace):
@@ -79,6 +104,129 @@ def update_versions(node, new_version, counts):
             node["waitCommand"]["version"] = new_version
 
 
+def _update_verb(verb):
+    if verb.lower() == "creates":
+        fixed = "updates"
+    else:
+        fixed = "update"
+    if verb[0].isupper():
+        return fixed.capitalize()
+    return fixed
+
+
+def _fix_update_examples_in_file(path):
+    pattern = UPDATE_EXAMPLE_PATTERNS.get(path.suffix.lower())
+    if not pattern or path.name not in ("_update.py", "_update.md"):
+        return 0
+
+    with path.open("r", encoding="utf-8", newline="") as file:
+        text = file.read()
+    replacements = 0
+
+    def repl(match):
+        nonlocal replacements
+        replacements += 1
+        return f"{match.group('prefix')}{_update_verb(match.group('verb'))}{match.group('rest')}"
+
+    fixed = pattern.sub(repl, text)
+    if replacements:
+        with path.open("w", encoding="utf-8", newline="") as file:
+            file.write(fixed)
+    return replacements
+
+
+def _iter_existing_roots(base, relative_paths):
+    if not base:
+        return
+    base_path = Path(base)
+    for rel_path in relative_paths:
+        path = base_path / rel_path
+        if path.exists():
+            yield path
+
+
+def fix_update_examples(ext):
+    """Fix generated update examples that still say Create/Creates."""
+    roots = []
+    roots.extend(_iter_existing_roots(os.environ.get("AAZ_CLI_EXTENSION_PATH"), EXTENSION_AAZ_PATHS[ext]))
+    roots.extend(_iter_existing_roots(os.environ.get("AAZ_PATH"), COMMAND_MODEL_PATHS[ext]))
+
+    total = 0
+    files = 0
+    for root in roots:
+        for suffix in ("*.py", "*.md"):
+            for path in root.rglob(suffix):
+                count = _fix_update_examples_in_file(path)
+                if count:
+                    total += count
+                    files += 1
+
+    print(f"Update example fix: {total} replacement(s) across {files} file(s).")
+
+
+def _get_azdev_command():
+    azdev = shutil.which("azdev")
+    if azdev:
+        return azdev
+    candidate = Path(sys.executable).with_name("azdev.exe")
+    if candidate.exists():
+        return str(candidate)
+    candidate = Path(sys.executable).with_name("azdev")
+    if candidate.exists():
+        return str(candidate)
+    return "azdev"
+
+
+def ask_run_checks(run_checks, no_run_checks):
+    """Return whether to run tests and linter after generation."""
+    if run_checks and no_run_checks:
+        raise ValueError("--run-checks and --no-run-checks cannot be used together")
+    if run_checks:
+        return True
+    if no_run_checks:
+        return False
+    if not sys.stdin.isatty():
+        print("\nSkipping test/linter prompt because stdin is not interactive.")
+        print("Use --run-checks to run tests and linter automatically.")
+        return False
+
+    while True:
+        answer = input("\nRun tests and linter now? [y/N]: ").strip().lower()
+        if answer in ("", "n", "no"):
+            return False
+        if answer in ("y", "yes"):
+            return True
+        print("Please answer y or n.")
+
+
+def run_tests_and_linter(ext):
+    """Run the relevant azdev test target and linter for an extension."""
+    azdev = _get_azdev_command()
+    test_target = TEST_TARGETS[ext]
+    commands = [
+        [azdev, "test", test_target],
+        [azdev, "linter", ext],
+    ]
+    for command in commands:
+        print(f"\nRunning: {' '.join(command)}")
+        result = subprocess.run(command, check=False)
+        if result.returncode != 0:
+            print(f"ERROR: command failed with exit code {result.returncode}: {' '.join(command)}", file=sys.stderr)
+            return False
+    return True
+
+
+def maybe_run_checks(ext, run_checks=False, no_run_checks=False):
+    try:
+        should_run = ask_run_checks(run_checks, no_run_checks)
+    except ValueError as err:
+        print(f"ERROR: {err}", file=sys.stderr)
+        sys.exit(1)
+
+    if should_run and not run_tests_and_linter(ext):
+        sys.exit(1)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--ext", required=True, choices=SUPPORTED_EXTS,
@@ -90,6 +238,12 @@ def main():
                              "(equivalent to clicking Export in the Web UI)")
     parser.add_argument("--dry-run", action="store_true",
                         help="Print what would change; do not PUT")
+    parser.add_argument("--no-fix-examples", action="store_true",
+                        help="Skip post-generation fix for update examples that say Create/Creates")
+    parser.add_argument("--run-checks", action="store_true",
+                        help="After generation, run the relevant azdev test target and linter without prompting")
+    parser.add_argument("--no-run-checks", action="store_true",
+                        help="After generation, skip the test/linter prompt")
     args = parser.parse_args()
 
     if args.workspace:
@@ -119,7 +273,10 @@ def main():
 
     print(f"PUT {BASE_URL}/CLI/Az/Extension/Modules/{args.ext} (triggers code generation)...")
     put_module(args.ext, data)
+    if not args.no_fix_examples:
+        fix_update_examples(args.ext)
     print("Done. Review changes with: git -C $env:AAZ_CLI_EXTENSION_PATH status")
+    maybe_run_checks(args.ext, args.run_checks, args.no_run_checks)
 
 
 if __name__ == "__main__":

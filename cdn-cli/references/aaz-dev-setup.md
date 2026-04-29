@@ -268,13 +268,22 @@ python .github\cdn-cli\scripts\auto_select_resources.py --ext cdn --version <new
 
 # Front Door example:
 python .github\cdn-cli\scripts\auto_select_resources.py --ext front-door --version <new-version>
+
+# Non-interactive: add resources, Export AAZ, and Generate CLI in one run
+python .github\cdn-cli\scripts\auto_select_resources.py --ext front-door --version <new-version> --auto-export
+
+# Non-interactive: add resources, Export AAZ, Generate CLI, then run tests + linter
+python .github\cdn-cli\scripts\auto_select_resources.py --ext front-door --version <new-version> --auto-export --run-checks
 ```
 
-The script creates a workspace, adds resources with inheritance, and generates swagger examples automatically.
-The script also auto-fixes common swagger example issues (e.g. `update` commands inheriting a "Creates ..." example name from the shared `CreateOrUpdate` swagger operation — these are rewritten to "Updates ...").
+The script creates a workspace, adds resources with inheritance, fills any missing command/group short summaries, and generates swagger examples automatically. If the workspace already exists, the script still fills missing short summaries and refreshes/fixes examples instead of returning silently.
+The script also auto-fixes common swagger example issues (e.g. `update` commands inheriting a "Creates ..." example name from the shared `CreateOrUpdate` swagger operation — these are rewritten to "Updates ..."). `generate_cli.py` repeats this fix after code generation as a safety net for already-exported workspaces.
+After resource setup, the script asks whether to Export the workspace to `aaz` and Generate CLI immediately. Answer `y` to run both steps automatically. Use `--auto-export` to force yes, or `--no-auto-export` to skip the prompt and continue with manual review/export. After CLI generation, the script asks whether to run tests and linter; use `--run-checks` to force yes, or `--no-run-checks` to skip the prompt.
 If the new swagger adds new resources/operations not in AAZ, add them to the workspace (see "Adding new resources" above).
 
 ### Step 4: Review and export workspace (Manual or Copilot)
+
+If you answered yes to the `auto_select_resources.py` prompt, Step 4 and Step 5 are already complete; go straight to reviewing diffs. Otherwise continue below.
 
 Option A — **Web UI** (manual):
 1. Open **http://127.0.0.1:5000**
@@ -307,11 +316,15 @@ python .github\cdn-cli\scripts\generate_cli.py --ext cdn --version 2025-09-01-pr
 # Optional: Export the workspace first (same as clicking Export in Web UI), then generate
 python .github\cdn-cli\scripts\generate_cli.py --ext front-door --version 2025-11-01 --workspace front-door-2025-11-01
 
+# Generate, then run the relevant tests + linter without prompting
+python .github\cdn-cli\scripts\generate_cli.py --ext front-door --version 2025-11-01 --run-checks
+
 # Dry run — show what would change without PUTing
 python .github\cdn-cli\scripts\generate_cli.py --ext cdn --version 2025-09-01-preview --dry-run
 ```
 
 This is safe because Export already wrote examples to `aaz`. The PUT reads examples from `aaz` when generating code.
+After generation, the script asks whether to run the relevant test target and linter. For `front-door`, it runs `azdev test test_waf_scenarios` and `azdev linter front-door`. For `cdn`, it runs `azdev test cdn` and `azdev linter cdn`. Use `--run-checks` for non-interactive yes, or `--no-run-checks` to skip the prompt.
 
 > **Key constraint**: Always Export workspace FIRST, then Generate CLI. If you skip Export, examples will be lost. `--workspace` does the Export as part of the same command.
 
@@ -333,7 +346,7 @@ git status; git diff --stat
 
 | Issue | Where to check | Fix |
 |-------|---------------|-----|
-| `update` command example says "Creates ..." | `:example:` docstring in `_update.py` | Change to "Updates ..." — swagger `CreateOrUpdate` shares one example across `create`/`update` |
+| `update` command example says "Creates ..." | `:example:` docstring in `_update.py` and examples in `_update.md` | Re-run `generate_cli.py` without `--no-fix-examples`, or change to "Updates ..." manually — swagger `CreateOrUpdate` shares one example across `create`/`update` |
 | Example name doesn't match command semantics | `:example:` docstrings in all generated `*.py` | Manually correct; `auto_select_resources.py` auto-fixes common cases but not all |
 | Missing examples | commands with no `:example:` | Add via Web UI or manually in the docstring |
 

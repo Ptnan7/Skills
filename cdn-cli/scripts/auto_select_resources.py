@@ -28,6 +28,8 @@ from base64 import b64encode
 
 import requests
 
+from generate_cli import export_workspace, fix_update_examples, get_module, maybe_run_checks, put_module, update_versions
+
 BASE_URL = "http://127.0.0.1:5000"
 PLANE = "mgmt-plane"
 
@@ -48,6 +50,32 @@ EXTENSION_PROFILES = {
         "ws_prefix": "front-door",
         "exclude_patterns": [],
     },
+}
+
+
+SUMMARY_VERBS = {
+    "create": "Create",
+    "delete": "Delete",
+    "list": "List",
+    "show": "Get",
+    "update": "Update",
+}
+
+SUMMARY_ACRONYMS = {
+    "afd": "AFD",
+    "cdn": "CDN",
+    "cors": "CORS",
+    "ddos": "DDoS",
+    "dns": "DNS",
+    "fqdn": "FQDN",
+    "http": "HTTP",
+    "https": "HTTPS",
+    "id": "ID",
+    "ip": "IP",
+    "ssl": "SSL",
+    "tls": "TLS",
+    "url": "URL",
+    "waf": "WAF",
 }
 
 
@@ -227,6 +255,112 @@ def _walk_command_tree(node, path_parts=None):
             yield from _walk_command_tree(grp, path_parts + [grp_name])
 
 
+def _walk_command_groups(node, path_parts=None):
+    """Recursively yield (group_path, node) for command groups."""
+    if path_parts is None:
+        path_parts = []
+
+    if path_parts:
+        yield "/".join(path_parts), node
+
+    if "commandGroups" in node:
+        for grp_name, grp in node["commandGroups"].items():
+            yield from _walk_command_groups(grp, path_parts + [grp_name])
+
+
+def _format_command_segment(segment):
+    words = []
+    for word in segment.replace("_", "-").split("-"):
+        words.append(SUMMARY_ACRONYMS.get(word.lower(), word.lower()))
+    return " ".join(words)
+
+
+def _pluralize_phrase(phrase):
+    words = phrase.split()
+    if not words:
+        return phrase
+    word = words[-1]
+    lower = word.lower()
+    if lower.endswith("y") and (len(lower) < 2 or lower[-2] not in "aeiou"):
+        words[-1] = f"{word[:-1]}ies"
+    elif not lower.endswith("s"):
+        words[-1] = f"{word}s"
+    return " ".join(words)
+
+
+def _get_resource_phrase(names):
+    if len(names) < 2:
+        return "resource"
+    return _format_command_segment(names[-2])
+
+
+def _build_command_summary(command):
+    names = command.get("names", [])
+    leaf_name = names[-1] if names else ""
+    verb = SUMMARY_VERBS.get(leaf_name, leaf_name.capitalize() if leaf_name else "Manage")
+    resource = _get_resource_phrase(names)
+    if leaf_name == "list":
+        resource = _pluralize_phrase(resource)
+    return f"{verb} {resource}."
+
+
+def _build_group_summary(group):
+    names = group.get("names", [])
+    resource = _format_command_segment(names[-1]) if names else "resources"
+    return f"Manage {_pluralize_phrase(resource)}."
+
+
+def fill_missing_short_summaries(ws_name):
+    """Patch generated commands/groups that have no help.short."""
+    r = requests.get(f"{BASE_URL}/AAZ/Editor/Workspaces/{ws_name}")
+    if r.status_code != 200:
+        print(f"    Could not load workspace for summaries: {r.status_code}")
+        return
+
+    ws_data = r.json()
+    tree = ws_data.get("commandTree", {})
+    updated_groups = 0
+    updated_commands = 0
+
+    for grp_path, group in _walk_command_groups(tree):
+        help_data = group.get("help") or {}
+        if not help_data.get("short"):
+            summary = _build_group_summary(group)
+            patch_url = f"{BASE_URL}/AAZ/Editor/Workspaces/{ws_name}/CommandTree/Nodes/aaz/{grp_path}"
+            r = requests.patch(patch_url, json={"help": {"short": summary, "lines": help_data.get("lines", [])}})
+            if r.status_code == 200:
+                print(f"    {grp_path}: {summary}")
+                updated_groups += 1
+            else:
+                print(f"    {grp_path}: summary patch failed ({r.status_code})")
+
+    r = requests.get(f"{BASE_URL}/AAZ/Editor/Workspaces/{ws_name}")
+    if r.status_code != 200:
+        print(f"    Could not reload workspace for command summaries: {r.status_code}")
+        return
+    tree = r.json().get("commandTree", {})
+
+    for grp_path, leaf_name in _walk_command_tree(tree):
+        leaf_url = f"{BASE_URL}/AAZ/Editor/Workspaces/{ws_name}/CommandTree/Nodes/aaz/{grp_path}/Leaves/{leaf_name}"
+        r = requests.get(leaf_url)
+        if r.status_code != 200:
+            print(f"    {grp_path}/{leaf_name}: load failed ({r.status_code})")
+            continue
+        command = r.json()
+        help_data = command.get("help") or {}
+        if help_data.get("short"):
+            continue
+        summary = _build_command_summary(command)
+        r = requests.patch(leaf_url, json={"help": {"short": summary, "lines": help_data.get("lines", [])}})
+        if r.status_code == 200:
+            print(f"    {grp_path}/{leaf_name}: {summary}")
+            updated_commands += 1
+        else:
+            print(f"    {grp_path}/{leaf_name}: summary patch failed ({r.status_code})")
+
+    print(f"  Short summaries: {updated_groups} group(s), {updated_commands} command(s) updated")
+
+
 def generate_examples_for_workspace(ws_name):
     """Call GenerateExamples(source=swagger) + patch for every command in workspace.
 
@@ -292,6 +426,72 @@ def generate_examples_for_workspace(ws_name):
         print("  (Ensure extension is installed: pip install -e src/<ext>)")
 
 
+def ask_export_and_generate(auto_export, no_auto_export):
+    """Return whether to export workspace and generate CLI after resource setup."""
+    if auto_export and no_auto_export:
+        raise ValueError("--auto-export and --no-auto-export cannot be used together")
+    if auto_export:
+        return True
+    if no_auto_export:
+        return False
+    if not sys.stdin.isatty():
+        print("\nSkipping Export/Generate prompt because stdin is not interactive.")
+        print("Use --auto-export to export AAZ and generate CLI automatically.")
+        return False
+
+    while True:
+        answer = input("\nExport workspace to AAZ and generate CLI now? [y/N]: ").strip().lower()
+        if answer in ("", "n", "no"):
+            return False
+        if answer in ("y", "yes"):
+            return True
+        print("Please answer y or n.")
+
+
+def export_and_generate_cli(ext, version, ws_name):
+    """Export workspace to AAZ, then generate CLI code for the extension."""
+    print(f"\nExporting workspace '{ws_name}' to AAZ...")
+    if not export_workspace(ws_name):
+        return False
+
+    print(f"Generating CLI module: {ext}")
+    data = get_module(ext)
+    profiles = data.get("profiles") or {}
+    latest = profiles.get("latest")
+    if not latest:
+        print("ERROR: module has no 'profiles.latest' node; Export may have failed.", file=sys.stderr)
+        return False
+
+    counts = {"commands_total": 0, "commands_changed": 0, "wait_changed": 0}
+    update_versions(latest, version, counts)
+    print(f"Commands in module: {counts['commands_total']}")
+    print(f"  version changes:  {counts['commands_changed']}")
+    print(f"  waitCommand changes: {counts['wait_changed']}")
+    print(f"  target version:   {version}")
+
+    print(f"PUT {BASE_URL}/CLI/Az/Extension/Modules/{ext} (triggers code generation)...")
+    put_module(ext, data)
+    fix_update_examples(ext)
+    print("Done. Review changes with: git -C $env:AAZ_CLI_EXTENSION_PATH status")
+    return True
+
+
+def maybe_export_and_generate_cli(args, ws_name):
+    try:
+        should_export = ask_export_and_generate(args.auto_export, args.no_auto_export)
+    except ValueError as err:
+        print(f"ERROR: {err}", file=sys.stderr)
+        sys.exit(1)
+
+    if should_export:
+        if not export_and_generate_cli(args.ext, args.version, ws_name):
+            sys.exit(1)
+        maybe_run_checks(args.ext, args.run_checks, args.no_run_checks)
+    else:
+        print(f"\nOpen http://127.0.0.1:5000 to review workspace '{ws_name}'.")
+        print("When ready, export manually or rerun with --auto-export.")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Auto-select swagger resources for aaz-dev workspace")
     parser.add_argument("--ext", "-e", required=True, choices=EXTENSION_PROFILES.keys(),
@@ -299,6 +499,14 @@ def main():
     parser.add_argument("--version", "-v", required=True, help="Target API version (e.g. 2025-11-01)")
     parser.add_argument("--workspace", "-w", help="Custom workspace name (default: <ext>-<version>)")
     parser.add_argument("--dry-run", action="store_true", help="Only show what would be selected")
+    parser.add_argument("--auto-export", action="store_true",
+                        help="After resource setup, export the workspace to AAZ and generate CLI without prompting")
+    parser.add_argument("--no-auto-export", action="store_true",
+                        help="After resource setup, skip the Export/Generate prompt")
+    parser.add_argument("--run-checks", action="store_true",
+                        help="After auto Export/Generate, run the relevant azdev test target and linter without prompting")
+    parser.add_argument("--no-run-checks", action="store_true",
+                        help="After auto Export/Generate, skip the test/linter prompt")
     args = parser.parse_args()
 
     profile = EXTENSION_PROFILES[args.ext]
@@ -333,6 +541,11 @@ def main():
     existing = get_existing_workspaces()
     if ws_name in existing:
         print(f"\nWorkspace '{ws_name}' already exists, skipping.")
+        print(f"  Filling missing short summaries in existing workspace...")
+        fill_missing_short_summaries(ws_name)
+        print(f"  Refreshing/fixing generated examples in existing workspace...")
+        generate_examples_for_workspace(ws_name)
+        maybe_export_and_generate_cli(args, ws_name)
         return
 
     print(f"\nCreating workspace '{ws_name}'...")
@@ -346,11 +559,14 @@ def main():
     except requests.exceptions.HTTPError as e:
         print(f"  Error: {e.response.status_code} - {e.response.text[:500]}")
 
+    print(f"\n  Filling missing short summaries...")
+    fill_missing_short_summaries(ws_name)
+
     # Generate examples from swagger x-ms-examples for each command
     print(f"\n  Generating examples from swagger...")
     generate_examples_for_workspace(ws_name)
 
-    print(f"\nOpen http://127.0.0.1:5000 to view and edit the workspace.")
+    maybe_export_and_generate_cli(args, ws_name)
 
 
 if __name__ == "__main__":

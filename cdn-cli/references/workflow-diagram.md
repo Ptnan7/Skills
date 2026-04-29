@@ -4,36 +4,56 @@ End-to-end flow for upgrading a CLI extension (`cdn` or `front-door`) to a new s
 
 ```mermaid
 flowchart TD
-    Start([User: upgrade swagger version]) --> Init{"Repos + venv<br/>ready?"}
-    Init -- No --> Bootstrap["initialize_aaz_dev_env.ps1<br/>(clone 4 repos + azdev venv)"]
-    Init -- Yes --> CheckRepos["check_repos.ps1<br/>(fast verify)"]
-    Bootstrap --> Activate
-    CheckRepos --> Activate["use_aaz_dev_env.ps1<br/>(activate venv + env vars)"]
+    Start([User asks to upgrade swagger]) --> CheckRepos{"Repos + azdev venv ready?"}
 
-    Activate --> Branch["git checkout -b branch<br/>(in extension + aaz)"]
-    Branch --> Diff["swagger_diff.py<br/>--ext cdn|front-door<br/>--old X --new Y"]
-    Diff --> Review1{{"User reviews diff,<br/>confirms to continue"}}
+    subgraph Prep[Prepare]
+        CheckRepos -- No --> Bootstrap["initialize_aaz_dev_env.ps1<br/>create missing repos + venv"]
+        CheckRepos -- Yes --> Verify["check_repos.ps1<br/>verify four repos"]
+        Bootstrap --> Activate["use_aaz_dev_env.ps1<br/>activate env + AAZ_* paths"]
+        Verify --> Activate
+        Activate --> Branch["Create feature branches<br/>extension + aaz"]
+        Branch --> Diff["swagger_diff.py<br/>old version -> new version"]
+    end
 
-    Review1 --> WebUI["restart_aaz_dev.ps1<br/>(launch http://127.0.0.1:5000)"]
-    WebUI --> AutoSelect["auto_select_resources.py<br/>--ext cdn|front-door --version Y<br/>(create workspace)"]
+    Diff --> ReviewDiff{{"Review swagger diff<br/>continue?"}}
 
-    AutoSelect --> Export{{"Manual:<br/>user clicks Export in Web UI<br/>(or --workspace auto-exports)"}}
-    Export --> Generate["generate_cli.py<br/>--ext cdn|front-door --version Y<br/>(bump versions + PUT -> generate)"]
+    subgraph Workspace[Build AAZ Workspace]
+        ReviewDiff --> StartUI["restart_aaz_dev.ps1<br/>open http://127.0.0.1:5000"]
+        StartUI --> SelectResources["auto_select_resources.py<br/>add resources + inherit AAZ"]
+        SelectResources --> PolishWorkspace["Fill short summaries<br/>Generate/fix examples"]
+    end
 
-    Generate --> Review2{{"User reviews<br/>git diff"}}
-    Review2 --> Test["azdev test / azdev linter"]
-    Test -- Fail --> Fix[Fix] --> Test
-    Test -- Pass --> Bump["update_history.py<br/>--ext cdn|front-door<br/>--version X.Y.Z --swagger-version Y"]
+    PolishWorkspace --> AutoExport{"Export AAZ + Generate CLI now?"}
 
-    Bump --> Commit[["git add + commit<br/>(in extension + aaz)"]]
+    subgraph Generate[Export And Generate]
+        AutoExport -- Yes --> ExportGenerate["auto_select_resources.py --auto-export<br/>Export workspace + generate CLI"]
+        AutoExport -- No --> ManualReview{{"Review workspace in Web UI"}}
+        ManualReview --> ManualExport{{"Manual Export<br/>user confirms"}}
+        ManualExport --> GenerateCLI["generate_cli.py<br/>bump versions + generate CLI"]
+    end
+
+    ExportGenerate --> ReviewCode
+    GenerateCLI --> ReviewCode
+
+    subgraph Validate[Review And Validate]
+        ReviewCode{{"Review git diff<br/>extension + aaz"}} --> RunChecks{"Run tests + linter now?"}
+        RunChecks -- Yes --> Checks["azdev test<br/>azdev linter"]
+        RunChecks -- No --> SkippedChecks["Record checks skipped<br/>or run later"]
+        Checks -- Fail --> Fix["Fix generated/custom issues"] --> ReviewCode
+        Checks -- Pass --> ReadyForVersion["Ready for version bump"]
+        SkippedChecks --> ReadyForVersion
+    end
+
+    ReadyForVersion --> Bump["update_history.py<br/>bump setup.py + HISTORY.rst"]
+    Bump --> Commit[["Commit changes<br/>extension + aaz"]]
     Commit --> End([Done])
 
     classDef script fill:#d4edda,stroke:#28a745,color:#000;
     classDef manual fill:#fff3cd,stroke:#ffc107,color:#000;
     classDef decision fill:#cfe2ff,stroke:#0d6efd,color:#000;
-    class Bootstrap,CheckRepos,Activate,Diff,WebUI,AutoSelect,Generate,Bump script;
-    class Review1,Review2,Export manual;
-    class Init decision;
+    class Bootstrap,Verify,Activate,Branch,Diff,StartUI,SelectResources,PolishWorkspace,ExportGenerate,GenerateCLI,Checks,Fix,ReadyForVersion,Bump script;
+    class ReviewDiff,ManualReview,ManualExport,ReviewCode manual;
+    class CheckRepos,AutoExport,RunChecks decision;
 ```
 
 ## Legend
@@ -51,6 +71,6 @@ flowchart TD
 | [use_aaz_dev_env.ps1](../scripts/use_aaz_dev_env.ps1) | Activate venv + export env vars in a new terminal |
 | [restart_aaz_dev.ps1](../scripts/restart_aaz_dev.ps1) | Launch / relaunch aaz-dev Web UI on port 5000 |
 | [swagger_diff.py](../scripts/swagger_diff.py) | Compare two swagger API versions |
-| [auto_select_resources.py](../scripts/auto_select_resources.py) | Create workspace with resources auto-selected |
-| [generate_cli.py](../scripts/generate_cli.py) | Bump command versions + PUT to trigger CLI code gen |
+| [auto_select_resources.py](../scripts/auto_select_resources.py) | Create workspace with resources auto-selected; optionally Export AAZ + Generate CLI after prompting |
+| [generate_cli.py](../scripts/generate_cli.py) | Bump command versions + PUT to trigger CLI code gen; optionally run tests + linter after prompting |
 | [update_history.py](../scripts/update_history.py) | Bump `setup.py` VERSION + prepend `HISTORY.rst` entry |
