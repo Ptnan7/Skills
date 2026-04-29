@@ -9,13 +9,13 @@ Before updating AAZ-generated code for a new API version, compare the old and ne
 Use the automated diff script to compare two API versions. Requires `AAZ_SWAGGER_PATH` (set by `use_aaz_dev_env.ps1`).
 
 ```powershell
-. .github\cdn-cli\scripts\use_aaz_dev_env.ps1
+. .github\skills\azure-cli-skill\scripts\use_aaz_dev_env.ps1
 
 # Front Door example: compare 2025-10-01 -> 2025-11-01
-python .github\cdn-cli\scripts\swagger_diff.py --ext front-door --old 2025-10-01 --new 2025-11-01
+python .github\skills\azure-cli-skill\scripts\swagger_diff.py --ext front-door --old 2025-10-01 --new 2025-11-01
 
 # CDN example: compare 2024-02-01 -> 2025-09-01-preview
-python .github\cdn-cli\scripts\swagger_diff.py --ext cdn --old 2024-02-01 --new 2025-09-01-preview
+python .github\skills\azure-cli-skill\scripts\swagger_diff.py --ext cdn --old 2024-02-01 --new 2025-09-01-preview
 ```
 
 The script:

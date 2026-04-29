@@ -58,7 +58,7 @@ flowchart TD
 
 ## Legend
 
-- **Green** — scripted step (invoke the named file under `.github/cdn-cli/scripts/`)
+- **Green** — scripted step (invoke the named file under `.github/skills/azure-cli-skill/scripts/`)
 - **Yellow** — requires human review, confirmation, or action before generation (review swagger diff, click Export in the Web UI)
 - **Blue** — conditional branch
 

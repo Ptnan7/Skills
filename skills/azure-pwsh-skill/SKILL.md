@@ -1,6 +1,6 @@
 ---
-name: cdn-pwsh
-description: "Maintain CDN/AFD AutoRest-generated Azure PowerShell modules. Use when updating a .Autorest README.md, regenerating a PowerShell module from swagger, fixing autorest or build-module.ps1 failures, identifying new or removed cmdlets, adding example docs or Pester tests, or merging separate CRUD test files into a single New-* test flow. Do NOT use for Azure CLI work, non-AutoRest PowerShell changes, or unrelated repository-wide refactors."
+name: azure-pwsh-skill
+description: "Maintain CDN/AFD AutoRest-generated Azure PowerShell modules. Use when upgrading swagger, API, or PowerShell module versions; updating a .Autorest README.md, regenerating a PowerShell module from swagger, fixing autorest or build-module.ps1 failures, identifying new or removed cmdlets, adding example docs or Pester tests, or merging separate CRUD test files into a single New-* test flow. Do NOT use for Azure CLI work, non-AutoRest PowerShell changes, or unrelated repository-wide refactors."
 argument-hint: "Describe the PowerShell task, e.g. 'update Cdn README.md and regenerate' or 'merge CRUD tests for FrontDoor routes'"
 ---
 
@@ -15,13 +15,13 @@ This skill covers maintaining the CDN/AFD AutoRest-generated Azure PowerShell mo
 One-time initialization (clones `azure-powershell` as `pwsh` and `azure-rest-api-specs` as `swagger` into the workspace):
 
 ```powershell
-& .github\cdn-pwsh\scripts\initialize_pwsh_env.ps1
+& .github\skills\azure-pwsh-skill\scripts\initialize_pwsh_env.ps1
 ```
 
 For every new terminal:
 
 ```powershell
-. .github\cdn-pwsh\scripts\use_pwsh_env.ps1
+. .github\skills\azure-pwsh-skill\scripts\use_pwsh_env.ps1
 ```
 
 This sets `$env:PWSH_REPO_PATH` and `$env:AAZ_SWAGGER_PATH` for scripts and commands below.
@@ -30,12 +30,12 @@ This sets `$env:PWSH_REPO_PATH` and `$env:AAZ_SWAGGER_PATH` for scripts and comm
 
 1. **Initialize environment** — run `initialize_pwsh_env.ps1` (Copilot)
 2. **Activate environment** — run `use_pwsh_env.ps1` in every new terminal
-3. **Diff swagger** — run `python .github\cdn-cli\scripts\swagger_diff.py --ext cdn --old <old-ver> --new <new-ver>` (shared with cdn-cli)
+3. **Diff swagger** — run `python .github\skills\azure-cli-skill\scripts\swagger_diff.py --ext cdn --old <old-ver> --new <new-ver>` (shared with azure-cli-skill)
 4. **Update README.md** — update commit hash / API version / directives in `.Autorest/README.md` (see [autorest-generation.md](references/autorest-generation.md))
 5. **Run autorest** — `autorest` from the `.Autorest/` directory
 6. **Review custom code** — check if `custom/` files reference changed models, renamed properties, or removed types from the swagger diff. Present findings to the user and wait for approval before editing. See [autorest-generation.md](references/autorest-generation.md) Step 3.
 7. **Build module** — `pwsh -File ./build-module.ps1`
-8. **Identify changes** — run `.github\cdn-pwsh\scripts\analyze_module.ps1 -Module <Name>` for new/removed cmdlets + unfilled example placeholders (see [development.md](references/development.md))
+8. **Identify changes** — run `.github\skills\azure-pwsh-skill\scripts\analyze_module.ps1 -Module <Name>` for new/removed cmdlets + unfilled example placeholders (see [development.md](references/development.md))
 9. **Test** — ask the user whether to run tests. If yes, run `pwsh -File ./test-module.ps1 -Record` to execute live tests and update recordings (see [testing.md](references/testing.md))
 10. **Commit** — if tests pass (or were skipped), ask the user whether to commit. If yes, stage and commit changes in the `pwsh` repo.
 

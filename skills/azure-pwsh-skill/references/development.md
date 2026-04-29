@@ -9,14 +9,14 @@ Covers what to do after a successful build: identifying cmdlet changes and keepi
 Run `analyze_module.ps1` to get new cmdlets, removed cmdlets, and unfilled example placeholders in a single pass. Source of truth is `exports/` (populated by `build-module.ps1`); falls back to `examples/` with a warning if the module has not been built yet.
 
 ```powershell
-. .github\cdn-pwsh\scripts\use_pwsh_env.ps1
+. .github\skills\azure-pwsh-skill\scripts\use_pwsh_env.ps1
 
 # By module name (resolves src/<Module>/<Module>.Autorest or generated/<Module>/<Module>.Autorest)
-& .github\cdn-pwsh\scripts\analyze_module.ps1 -Module Cdn
-& .github\cdn-pwsh\scripts\analyze_module.ps1 -Module FrontDoor
+& .github\skills\azure-pwsh-skill\scripts\analyze_module.ps1 -Module Cdn
+& .github\skills\azure-pwsh-skill\scripts\analyze_module.ps1 -Module FrontDoor
 
 # Or by explicit path
-& .github\cdn-pwsh\scripts\analyze_module.ps1 -ModulePath C:\path\to\Cdn.Autorest
+& .github\skills\azure-pwsh-skill\scripts\analyze_module.ps1 -ModulePath C:\path\to\Cdn.Autorest
 ```
 
 Output sections:

@@ -9,7 +9,7 @@ flowchart TD
     Init -- Yes --> Activate
     Bootstrap --> Activate["use_pwsh_env.ps1<br/>(set PWSH_REPO_PATH +<br/>AAZ_SWAGGER_PATH)"]
 
-    Activate --> Diff["swagger_diff.py<br/>--ext cdn --old X --new Y<br/>(shared with cdn-cli)"]
+    Activate --> Diff["swagger_diff.py<br/>--ext cdn --old X --new Y<br/>(shared with azure-cli-skill)"]
     Diff --> Review1{{"User reviews diff"}}
 
     Review1 --> UpdateReadme{{"Manual + Copilot:<br/>edit .Autorest/README.md<br/>(commit hash, API version,<br/>directives)"}}
@@ -47,7 +47,7 @@ flowchart TD
 
 ## Legend
 
-- **Green** — scripted step (invoke the named file under `.github/cdn-pwsh/scripts/`)
+- **Green** — scripted step (invoke the named file under `.github/skills/azure-pwsh-skill/scripts/`)
 - **Grey** — external tool (autorest / build-module / test-module / git)
 - **Yellow** — requires user decision or action
 - **Blue** — conditional branch
@@ -60,4 +60,4 @@ flowchart TD
 | [use_pwsh_env.ps1](../scripts/use_pwsh_env.ps1) | Export `PWSH_REPO_PATH` + `AAZ_SWAGGER_PATH` in a new terminal |
 | [analyze_module.ps1](../scripts/analyze_module.ps1) | Report new/removed cmdlets + unfilled example placeholders |
 
-The swagger diff script lives in the sibling skill: [`.github/cdn-cli/scripts/swagger_diff.py`](../../cdn-cli/scripts/swagger_diff.py).
+The swagger diff script lives in the sibling skill: [`.github/skills/azure-cli-skill/scripts/swagger_diff.py`](../../azure-cli-skill/scripts/swagger_diff.py).

@@ -10,9 +10,9 @@
 #   3. $env:PWSH_REPO_PATH\generated\<Module>\<Module>.Autorest
 #
 # Usage:
-#   & .github\cdn-pwsh\scripts\analyze_module.ps1 -Module Cdn
-#   & .github\cdn-pwsh\scripts\analyze_module.ps1 -Module FrontDoor
-#   & .github\cdn-pwsh\scripts\analyze_module.ps1 -ModulePath C:\path\to\Cdn.Autorest
+#   & .github\skills\azure-pwsh-skill\scripts\analyze_module.ps1 -Module Cdn
+#   & .github\skills\azure-pwsh-skill\scripts\analyze_module.ps1 -Module FrontDoor
+#   & .github\skills\azure-pwsh-skill\scripts\analyze_module.ps1 -ModulePath C:\path\to\Cdn.Autorest
 #
 # Exit codes:
 #   0 — analysis completed (even if new/removed cmdlets exist; this is informational)
@@ -43,7 +43,7 @@ function Resolve-AutorestDir {
     }
 
     if (-not $env:PWSH_REPO_PATH) {
-        throw "PWSH_REPO_PATH is not set. Run: . .github\cdn-pwsh\scripts\use_pwsh_env.ps1"
+        throw "PWSH_REPO_PATH is not set. Run: . .github\skills\azure-pwsh-skill\scripts\use_pwsh_env.ps1"
     }
 
     $candidates = @(

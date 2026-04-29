@@ -3,10 +3,10 @@
 # Uses the shared azdev virtual environment and repo root.
 #
 # Usage:
-#   & .github\cdn-cli\scripts\restart_aaz_dev.ps1
+#   & .github\skills\azure-cli-skill\scripts\restart_aaz_dev.ps1
 #
 # Prerequisites:
-#   - One-time setup completed: .github\cdn-cli\scripts\initialize_aaz_dev_env.ps1
+#   - One-time setup completed: .github\skills\azure-cli-skill\scripts\initialize_aaz_dev_env.ps1
 #   - Repo root defaults to C:\Users\<User>\source\repos unless -RepoRoot is supplied
 
 param(

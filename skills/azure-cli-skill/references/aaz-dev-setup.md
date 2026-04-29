@@ -6,8 +6,8 @@
 > Repo root is auto-detected from the current workspace; if detection fails, the fallback is `C:\Users\<User>\source\repos`.
 > Run one-time initialization first, then activate the shared environment in every new terminal:
 > ```powershell
-> & .github\cdn-cli\scripts\initialize_aaz_dev_env.ps1
-> . .github\cdn-cli\scripts\use_aaz_dev_env.ps1
+> & .github\skills\azure-cli-skill\scripts\initialize_aaz_dev_env.ps1
+> . .github\skills\azure-cli-skill\scripts\use_aaz_dev_env.ps1
 > ```
 
 ## Local Environment Setup
@@ -33,7 +33,7 @@ After that, all skill commands below assume the current workspace is `Toolings`.
 One-time bootstrap:
 
 ```powershell
-& .github\cdn-cli\scripts\initialize_aaz_dev_env.ps1 -PersistUserRepoRoot
+& .github\skills\azure-cli-skill\scripts\initialize_aaz_dev_env.ps1 -PersistUserRepoRoot
 ```
 
 If the venv or any of the four repos (`extension`, `swagger`, `aaz`, `cli`) is missing, the bootstrap script creates the missing pieces.
@@ -41,14 +41,14 @@ If the venv or any of the four repos (`extension`, `swagger`, `aaz`, `cli`) is m
 To verify the four repos exist **without** triggering a clone or venv activation:
 
 ```powershell
-& .github\cdn-cli\scripts\check_repos.ps1        # human-readable output
-& .github\cdn-cli\scripts\check_repos.ps1 -Quiet # exit code only (0 ok, 1 missing)
+& .github\skills\azure-cli-skill\scripts\check_repos.ps1        # human-readable output
+& .github\skills\azure-cli-skill\scripts\check_repos.ps1 -Quiet # exit code only (0 ok, 1 missing)
 ```
 
 For every new PowerShell terminal:
 
 ```powershell
-. .github\cdn-cli\scripts\use_aaz_dev_env.ps1
+. .github\skills\azure-cli-skill\scripts\use_aaz_dev_env.ps1
 aaz-dev --version
 ```
 
@@ -64,7 +64,7 @@ Environment variables required by `aaz-dev`:
 **PowerShell activation:**
 
 ```powershell
-. .github\cdn-cli\scripts\use_aaz_dev_env.ps1
+. .github\skills\azure-cli-skill\scripts\use_aaz_dev_env.ps1
 aaz-dev --version
 ```
 
@@ -87,7 +87,7 @@ pip install -e .
 Launch (or relaunch) the web UI — activates the venv, verifies the four repos, frees port 5000, and starts `aaz-dev run` with all paths wired in:
 
 ```powershell
-& .github\cdn-cli\scripts\restart_aaz_dev.ps1
+& .github\skills\azure-cli-skill\scripts\restart_aaz_dev.ps1
 ```
 
 Opens at **http://127.0.0.1:5000**. Workflow:
@@ -141,26 +141,26 @@ When creating a workspace with many resources, use the script to pre-select corr
 ```powershell
 # Requires aaz-dev web UI running on http://127.0.0.1:5000
 # Must run from the azdev virtual environment:
-. .github\cdn-cli\scripts\use_aaz_dev_env.ps1
+. .github\skills\azure-cli-skill\scripts\use_aaz_dev_env.ps1
 
 # --- CDN / AFD ---
 
 # Dry run (see what would be selected)
-python .github\cdn-cli\scripts\auto_select_resources.py --ext cdn --version 2025-09-01-preview --dry-run
+python .github\skills\azure-cli-skill\scripts\auto_select_resources.py --ext cdn --version 2025-09-01-preview --dry-run
 
 # Create workspace with resources
-python .github\cdn-cli\scripts\auto_select_resources.py --ext cdn --version 2025-09-01-preview
+python .github\skills\azure-cli-skill\scripts\auto_select_resources.py --ext cdn --version 2025-09-01-preview
 
 # Custom workspace name
-python .github\cdn-cli\scripts\auto_select_resources.py --ext cdn --version 2025-09-01-preview --workspace cdn-0901
+python .github\skills\azure-cli-skill\scripts\auto_select_resources.py --ext cdn --version 2025-09-01-preview --workspace cdn-0901
 
 # --- Front Door ---
 
 # Dry run
-python .github\cdn-cli\scripts\auto_select_resources.py --ext front-door --version 2025-11-01 --dry-run
+python .github\skills\azure-cli-skill\scripts\auto_select_resources.py --ext front-door --version 2025-11-01 --dry-run
 
 # Create workspace with resources
-python .github\cdn-cli\scripts\auto_select_resources.py --ext front-door --version 2025-11-01
+python .github\skills\azure-cli-skill\scripts\auto_select_resources.py --ext front-door --version 2025-11-01
 ```
 
 The script:
@@ -205,8 +205,8 @@ Complete steps to upgrade an extension from one API version to another.
 
 ### Prerequisites
 
-- `aaz-dev` running: `& .github\cdn-cli\scripts\restart_aaz_dev.ps1`
-- Virtual environment activated: `. .github\cdn-cli\scripts\use_aaz_dev_env.ps1`
+- `aaz-dev` running: `& .github\skills\azure-cli-skill\scripts\restart_aaz_dev.ps1`
+- Virtual environment activated: `. .github\skills\azure-cli-skill\scripts\use_aaz_dev_env.ps1`
 - Local `azure-rest-api-specs` repo up to date with the new swagger version
 - **Extension installed in azdev venv** (required for Web UI features like Add Example):
   ```powershell
@@ -238,10 +238,10 @@ Run the swagger diff script to compare old vs new versions:
 
 ```powershell
 # Front Door example
-python .github\cdn-cli\scripts\swagger_diff.py --ext front-door --old <old-version> --new <new-version>
+python .github\skills\azure-cli-skill\scripts\swagger_diff.py --ext front-door --old <old-version> --new <new-version>
 
 # CDN example
-python .github\cdn-cli\scripts\swagger_diff.py --ext cdn --old <old-version> --new <new-version>
+python .github\skills\azure-cli-skill\scripts\swagger_diff.py --ext cdn --old <old-version> --new <new-version>
 ```
 
 The script parses the swagger `readme.md`, loads all JSON files for each tag, and reports:
@@ -264,16 +264,16 @@ Get-ChildItem -Path "$env:AAZ_CLI_EXTENSION_PATH\src\front-door\azext_front_door
 
 ```powershell
 # CDN example:
-python .github\cdn-cli\scripts\auto_select_resources.py --ext cdn --version <new-version>
+python .github\skills\azure-cli-skill\scripts\auto_select_resources.py --ext cdn --version <new-version>
 
 # Front Door example:
-python .github\cdn-cli\scripts\auto_select_resources.py --ext front-door --version <new-version>
+python .github\skills\azure-cli-skill\scripts\auto_select_resources.py --ext front-door --version <new-version>
 
 # Non-interactive: add resources, Export AAZ, and Generate CLI in one run
-python .github\cdn-cli\scripts\auto_select_resources.py --ext front-door --version <new-version> --auto-export
+python .github\skills\azure-cli-skill\scripts\auto_select_resources.py --ext front-door --version <new-version> --auto-export
 
 # Non-interactive: add resources, Export AAZ, Generate CLI, then run tests + linter
-python .github\cdn-cli\scripts\auto_select_resources.py --ext front-door --version <new-version> --auto-export --run-checks
+python .github\skills\azure-cli-skill\scripts\auto_select_resources.py --ext front-door --version <new-version> --auto-export --run-checks
 ```
 
 The script creates a workspace, adds resources with inheritance, fills any missing command/group short summaries, and generates swagger examples automatically. If the workspace already exists, the script still fills missing short summaries and refreshes/fixes examples instead of returning silently.
@@ -309,19 +309,19 @@ After Export is done, **first verify the aaz repo has changes** (`git -C $env:AA
 
 ```powershell
 # Front Door
-python .github\cdn-cli\scripts\generate_cli.py --ext front-door --version 2025-11-01
+python .github\skills\azure-cli-skill\scripts\generate_cli.py --ext front-door --version 2025-11-01
 
 # CDN / AFD
-python .github\cdn-cli\scripts\generate_cli.py --ext cdn --version 2025-09-01-preview
+python .github\skills\azure-cli-skill\scripts\generate_cli.py --ext cdn --version 2025-09-01-preview
 
 # Optional: Export the workspace first (same as clicking Export in Web UI), then generate
-python .github\cdn-cli\scripts\generate_cli.py --ext front-door --version 2025-11-01 --workspace front-door-2025-11-01
+python .github\skills\azure-cli-skill\scripts\generate_cli.py --ext front-door --version 2025-11-01 --workspace front-door-2025-11-01
 
 # Generate, then run the relevant tests + linter without prompting
-python .github\cdn-cli\scripts\generate_cli.py --ext front-door --version 2025-11-01 --run-checks
+python .github\skills\azure-cli-skill\scripts\generate_cli.py --ext front-door --version 2025-11-01 --run-checks
 
 # Dry run — show what would change without PUTing
-python .github\cdn-cli\scripts\generate_cli.py --ext cdn --version 2025-09-01-preview --dry-run
+python .github\skills\azure-cli-skill\scripts\generate_cli.py --ext cdn --version 2025-09-01-preview --dry-run
 ```
 
 This is safe because Export already wrote examples to `aaz`. The PUT reads examples from `aaz` when generating code.
@@ -378,18 +378,18 @@ Bump `setup.py` `VERSION` and prepend a `HISTORY.rst` entry. Supports both exten
 
 ```powershell
 # Front Door
-python .github\cdn-cli\scripts\update_history.py --ext front-door --version 2.3.0 `
+python .github\skills\azure-cli-skill\scripts\update_history.py --ext front-door --version 2.3.0 `
     --swagger-version 2025-11-01 `
     --message "Add support for managed rule set exceptions" `
     --message "Add new enum values: JA4 (MatchVariable), AsnMatch and ClientFingerprint (Operator)"
 
 # CDN / AFD
-python .github\cdn-cli\scripts\update_history.py --ext cdn --version 3.1.0 `
+python .github\skills\azure-cli-skill\scripts\update_history.py --ext cdn --version 3.1.0 `
     --swagger-version 2025-09-01-preview `
     --message "Describe the user-facing change here"
 
 # Preview only
-python .github\cdn-cli\scripts\update_history.py --ext front-door --version 2.3.0 `
+python .github\skills\azure-cli-skill\scripts\update_history.py --ext front-door --version 2.3.0 `
     --swagger-version 2025-11-01 --dry-run
 ```
 

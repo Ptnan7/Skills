@@ -3,9 +3,9 @@
 # Exit code 0 = all present; 1 = one or more missing.
 #
 # Usage:
-#   & .github\cdn-cli\scripts\check_repos.ps1
-#   & .github\cdn-cli\scripts\check_repos.ps1 -RepoRoot C:\path\to\repos
-#   & .github\cdn-cli\scripts\check_repos.ps1 -Quiet
+#   & .github\skills\azure-cli-skill\scripts\check_repos.ps1
+#   & .github\skills\azure-cli-skill\scripts\check_repos.ps1 -RepoRoot C:\path\to\repos
+#   & .github\skills\azure-cli-skill\scripts\check_repos.ps1 -Quiet
 
 param(
     [string]$RepoRoot,

@@ -1,7 +1,7 @@
 ---
 name: repo-skill-junctions
 description: "Expose a shared skill directory as a repo-local project skill on Windows by creating a junction under .github/skills and adding a matching entry to .git/info/exclude. Use when wiring a skill from a shared Skills folder into a specific repository such as pwsh, cli, or extension without committing the link. Do NOT use for editing the skill content itself, for user-global ~/.copilot skills, or for Linux/macOS symlink setup."
-argument-hint: "Describe the repo and shared skill to link, e.g. 'link Skills/cdn-cli into extension'"
+argument-hint: "Describe the repo and shared skill to link, e.g. 'link Skills/azure-cli-skill into extension'"
 ---
 
 # Repository Skill Junctions
@@ -24,8 +24,8 @@ This keeps the skill available to Copilot in that repository without introducing
 Collect these inputs if they are not already provided:
 
 1. Target repository root, for example `C:\Users\jingnanxu\source\repos\pwsh`
-2. Shared skill directory, for example `C:\Users\jingnanxu\source\repos\Skills\cdn-pwsh`
-3. Skill name, usually the shared skill folder name such as `cdn-pwsh`
+2. Shared skill directory, for example `C:\Users\jingnanxu\source\repos\Skills\azure-pwsh-skill`
+3. Skill name, usually the shared skill folder name such as `azure-pwsh-skill`
 
 Derived paths:
 
@@ -186,6 +186,6 @@ Action:
 
 ## Examples
 
-- "Link Skills/cdn-pwsh into pwsh as a local project skill"
-- "Expose Skills/cdn-cli inside extension without changing tracked git files"
+- "Link Skills/azure-pwsh-skill into pwsh as a local project skill"
+- "Expose Skills/azure-cli-skill inside extension without changing tracked git files"
 - "Create a repo-local skill junction for cli and hide it from git status"

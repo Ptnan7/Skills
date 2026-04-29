@@ -4,9 +4,9 @@
 # Optionally clones the swagger repo (if missing) for swagger diff support.
 #
 # Usage:
-#   & .github\cdn-pwsh\scripts\initialize_pwsh_env.ps1
-#   & .github\cdn-pwsh\scripts\initialize_pwsh_env.ps1 -RepoRoot C:\myrepos
-#   & .github\cdn-pwsh\scripts\initialize_pwsh_env.ps1 -SkipSwagger
+#   & .github\skills\azure-pwsh-skill\scripts\initialize_pwsh_env.ps1
+#   & .github\skills\azure-pwsh-skill\scripts\initialize_pwsh_env.ps1 -RepoRoot C:\myrepos
+#   & .github\skills\azure-pwsh-skill\scripts\initialize_pwsh_env.ps1 -SkipSwagger
 
 param(
     [string]$RepoRoot,
@@ -70,7 +70,7 @@ if (-not (Test-Path $pwshPath)) {
     Write-Host "Repo already exists: $pwshPath"
 }
 
-# Clone swagger repo (shared with cdn-cli) for diff support
+# Clone swagger repo (shared with azure-cli-skill) for diff support
 $swaggerPath = Join-Path $resolvedRoot "swagger"
 if (-not $SkipSwagger) {
     if (-not (Test-Path $swaggerPath)) {
@@ -94,4 +94,4 @@ if (-not $SkipSwagger) {
 }
 Write-Host ""
 Write-Host "Activate in new terminals:"
-Write-Host "  . .github\cdn-pwsh\scripts\use_pwsh_env.ps1"
+Write-Host "  . .github\skills\azure-pwsh-skill\scripts\use_pwsh_env.ps1"

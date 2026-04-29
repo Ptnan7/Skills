@@ -49,8 +49,8 @@ def get_swagger_root(swagger_path_arg=None):
     if not root or not os.path.isdir(root):
         print("ERROR: Swagger repo not found.", file=sys.stderr)
         print("  Use --swagger-path <path>, or set AAZ_SWAGGER_PATH, or run:", file=sys.stderr)
-        print("    . .github\\cdn-cli\\scripts\\use_aaz_dev_env.ps1", file=sys.stderr)
-        print("    . .github\\cdn-pwsh\\scripts\\use_pwsh_env.ps1", file=sys.stderr)
+        print("    . .github\\azure-cli-skill\\scripts\\use_aaz_dev_env.ps1", file=sys.stderr)
+        print("    . .github\\azure-pwsh-skill\\scripts\\use_pwsh_env.ps1", file=sys.stderr)
         sys.exit(1)
     return root
 

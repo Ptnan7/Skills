@@ -45,7 +45,7 @@ def resolve_extension_root(extension_path_arg):
     if not root or not os.path.isdir(root):
         print("ERROR: extension repo not found.", file=sys.stderr)
         print("  Use --extension-path <path>, set AAZ_CLI_EXTENSION_PATH,", file=sys.stderr)
-        print("  or run: . .github\\cdn-cli\\scripts\\use_aaz_dev_env.ps1", file=sys.stderr)
+        print("  or run: . .github\\azure-cli-skill\\scripts\\use_aaz_dev_env.ps1", file=sys.stderr)
         sys.exit(1)
     return Path(root)
 

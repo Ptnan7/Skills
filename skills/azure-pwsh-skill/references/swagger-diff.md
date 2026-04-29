@@ -6,16 +6,16 @@ Before updating a module, compare the old and new swagger to understand which AP
 
 ## Quick Diff with Script (Preferred)
 
-Use the shared diff script (from `cdn-cli`). Requires `AAZ_SWAGGER_PATH` (set by `use_pwsh_env.ps1`).
+Use the shared diff script (from `azure-cli-skill`). Requires `AAZ_SWAGGER_PATH` (set by `use_pwsh_env.ps1`).
 
 ```powershell
-. .github\cdn-pwsh\scripts\use_pwsh_env.ps1
+. .github\skills\azure-pwsh-skill\scripts\use_pwsh_env.ps1
 
 # CDN / AFD module
-python .github\cdn-cli\scripts\swagger_diff.py --ext cdn --old <old-version> --new <new-version>
+python .github\skills\azure-cli-skill\scripts\swagger_diff.py --ext cdn --old <old-version> --new <new-version>
 
 # Front Door WAF (if needed)
-python .github\cdn-cli\scripts\swagger_diff.py --ext front-door --old <old-version> --new <new-version>
+python .github\skills\azure-cli-skill\scripts\swagger_diff.py --ext front-door --old <old-version> --new <new-version>
 ```
 
 The script parses the swagger `readme.md`, loads all JSON files for each tag, and reports:
