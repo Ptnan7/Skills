@@ -231,9 +231,154 @@ def select_resources(profile, target_version=None):
                 "id": res_id,
                 "versions": available_versions[-3:] if available_versions else [],
                 "has_aaz": bool(aaz_versions),
+                "aaz_versions": aaz_versions,
             })
 
     return selected, skipped
+
+
+def _choose_version(versions, target_version):
+    if target_version and target_version in versions:
+        return target_version
+    return versions[-1] if versions else target_version
+
+
+def _print_resource_items(items, show_aaz=False):
+    if not items:
+        print("  None")
+        return
+    for idx, item in enumerate(items, start=1):
+        print(f"  [{idx}] {item['id']}")
+        print(f"      versions: {item.get('versions') or []}")
+        if show_aaz:
+            print(f"      aaz versions: {item.get('aaz_versions') or []}")
+
+
+def _ask_include_resources(title, candidates, include_mode, target_version, existing=False):
+    if not candidates:
+        return []
+    if include_mode == "all":
+        chosen_indexes = set(range(1, len(candidates) + 1))
+    elif include_mode == "none":
+        chosen_indexes = set()
+    elif not sys.stdin.isatty():
+        print(f"\nSkipping prompt for {title} because stdin is not interactive.")
+        chosen_indexes = set()
+    else:
+        print(f"\n{title}")
+        _print_resource_items(candidates, show_aaz=existing)
+        print("Enter indexes to include (comma-separated), 'all', or press Enter for none.")
+        answer = input("Include resources? [none]: ").strip().lower()
+        if not answer:
+            chosen_indexes = set()
+        elif answer == "all":
+            chosen_indexes = set(range(1, len(candidates) + 1))
+        else:
+            chosen_indexes = set()
+            for part in answer.split(","):
+                part = part.strip()
+                if not part:
+                    continue
+                try:
+                    idx = int(part)
+                except ValueError:
+                    print(f"  Ignoring invalid index: {part}")
+                    continue
+                if 1 <= idx <= len(candidates):
+                    chosen_indexes.add(idx)
+                else:
+                    print(f"  Ignoring out-of-range index: {idx}")
+
+    included = []
+    for idx, item in enumerate(candidates, start=1):
+        if idx not in chosen_indexes:
+            continue
+        entry = {
+            "id": item["id"],
+            "version": _choose_version(item.get("versions") or [], target_version),
+            "reason": "manually included existing AAZ resource" if existing else "manually included new resource",
+        }
+        if existing and item.get("aaz_versions"):
+            entry["aaz_version"] = item["aaz_versions"][-1]
+        included.append(entry)
+    return included
+
+
+def finalize_selected_resources(selected, skipped, target_version, include_new, include_existing):
+    """Print resource lists and optionally add skipped resources to the final AddSwagger list."""
+    selected_ids = {item["id"] for item in selected}
+    new_candidates = [
+        item for item in skipped
+        if not item.get("has_aaz") and item["id"] not in selected_ids
+    ]
+    existing_unselected = [
+        item for item in skipped
+        if item.get("has_aaz") and item["id"] not in selected_ids
+    ]
+
+    print("\n=== RESOURCE PLAN BEFORE AddSwagger ===")
+    print(f"\nSelected existing APIs to update/add ({len(selected)}):")
+    if selected:
+        for item in selected:
+            print(f"  - {item['id']}")
+            print(f"      version: {item['version']}  ({item['reason']})")
+            if item.get("aaz_version"):
+                print(f"      inherit from AAZ: {item['aaz_version']}")
+    else:
+        print("  None")
+
+    print(f"\nNew APIs not in AAZ ({len(new_candidates)}):")
+    _print_resource_items(new_candidates)
+    print("  Ask whether any of these need to be created as new commands/resources.")
+
+    print(f"\nExisting AAZ APIs not selected ({len(existing_unselected)}):")
+    _print_resource_items(existing_unselected, show_aaz=True)
+    print("  Ask whether any of these existing APIs still need to be added.")
+
+    additions = []
+    additions.extend(_ask_include_resources(
+        "New APIs not in AAZ: should any be created?",
+        new_candidates,
+        include_new,
+        target_version,
+        existing=False,
+    ))
+    additions.extend(_ask_include_resources(
+        "Existing AAZ APIs not selected: should any still be added?",
+        existing_unselected,
+        include_existing,
+        target_version,
+        existing=True,
+    ))
+
+    final = [*selected]
+    final_ids = {item["id"] for item in final}
+    for item in additions:
+        if item["id"] not in final_ids:
+            final.append(item)
+            final_ids.add(item["id"])
+    return final, new_candidates, existing_unselected
+
+
+def print_add_swagger_payload(resources, profile):
+    """Print the final AddSwagger payload grouped by version."""
+    by_version = {}
+    for item in resources:
+        by_version.setdefault(item["version"], []).append(item)
+
+    print("\n=== FINAL AddSwagger RESOURCE PARAMETERS ===")
+    if not resources:
+        print("  None")
+        return
+    for version, items in by_version.items():
+        print(f"\nmodule: {profile['mod_names']}")
+        print(f"version: {version}")
+        print("resources:")
+        for item in items:
+            print(f"  - id: {item['id']}")
+            if item.get("aaz_version"):
+                print(f"    options:")
+                print(f"      aaz_version: {item['aaz_version']}")
 
 
 def _walk_command_tree(node, path_parts=None):
@@ -507,6 +652,10 @@ def main():
                         help="After auto Export/Generate, run the relevant azdev test target and linter without prompting")
     parser.add_argument("--no-run-checks", action="store_true",
                         help="After auto Export/Generate, skip the test/linter prompt")
+    parser.add_argument("--include-new-resources", choices=("all", "none"), default=None,
+                        help="Whether to include new resources that have no AAZ history without prompting")
+    parser.add_argument("--include-existing-skipped", choices=("all", "none"), default=None,
+                        help="Whether to include skipped resources that already have AAZ history without prompting")
     args = parser.parse_args()
 
     profile = EXTENSION_PROFILES[args.ext]
@@ -529,6 +678,15 @@ def main():
     for r in skipped:
         print(f"  [-] {r['id']}")
         print(f"      versions: {r['versions']}  aaz: {r['has_aaz']}")
+
+    selected, _, _ = finalize_selected_resources(
+        selected,
+        skipped,
+        args.version,
+        "none" if args.dry_run else args.include_new_resources,
+        "none" if args.dry_run else args.include_existing_skipped,
+    )
+    print_add_swagger_payload(selected, profile)
 
     if args.dry_run:
         print("\n(dry run - no changes made)")

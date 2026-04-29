@@ -148,6 +148,63 @@ def extract_operations(paths):
     return ops
 
 
+def swagger_path_to_resource_id(path):
+    """Convert a swagger path to the normalized AAZ resource id shape."""
+    return re.sub(r"\{[^}]+\}", "{}", path).lower()
+
+
+def _print_operation_resource_list(title, items, op_lookup=None):
+    print(f"\n  {title} ({len(items)}):")
+    if not items:
+        print("    None")
+        return
+    for item in items:
+        if isinstance(item, dict):
+            method, path = item["operation"]
+            added_params = item.get("added_params") or []
+            removed_params = item.get("removed_params") or []
+        else:
+            method, path = item
+            added_params = []
+            removed_params = []
+        op_info = (op_lookup or {}).get((method, path), {})
+        operation_id = op_info.get("operationId", "")
+        resource_id = swagger_path_to_resource_id(path)
+        print(f"    - {method} {path}")
+        if operation_id:
+            print(f"      operationId: {operation_id}")
+        print(f"      resource: {resource_id}")
+        if added_params:
+            print(f"      new params: {', '.join(added_params)}")
+        if removed_params:
+            print(f"      removed params: {', '.join(removed_params)}")
+
+
+def print_resource_plan(new_ops, ops_added, ops_modified):
+    """Print API/resource candidates useful before AddSwagger."""
+    updated_resources = sorted({swagger_path_to_resource_id(path) for _, path in [m["operation"] for m in ops_modified]})
+    new_resources = sorted({swagger_path_to_resource_id(path) for _, path in ops_added})
+    add_candidates = sorted(set(updated_resources) | set(new_resources))
+
+    print("\n## API / Resource Planning\n")
+    _print_operation_resource_list("Updated APIs (same method/path, changed parameters)", ops_modified, new_ops)
+    _print_operation_resource_list("New APIs (not present in old swagger)", ops_added, new_ops)
+
+    print(f"\n  AddSwagger resource candidates ({len(add_candidates)}):")
+    if add_candidates:
+        for resource_id in add_candidates:
+            marker = []
+            if resource_id in updated_resources:
+                marker.append("updated")
+            if resource_id in new_resources:
+                marker.append("new")
+            print(f"    - {resource_id}  ({', '.join(marker)})")
+    else:
+        print("    None")
+    print("\n  Next: before AddSwagger, run auto_select_resources.py to compare these candidates with AAZ history,")
+    print("  ask whether new APIs should be created, and print the final AddSwagger payload.")
+
+
 def extract_enum_values(definitions):
     """Extract enum values from all definitions."""
     enums = {}
@@ -391,6 +448,7 @@ def main():
         models_added, models_removed, models_modified,
         enum_changes,
     )
+    print_resource_plan(new_ops, ops_added, ops_modified)
 
 
 if __name__ == "__main__":

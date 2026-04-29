@@ -23,6 +23,7 @@ The script:
 2. Loads and merges all JSON files for each tag
 3. Compares operations, models, enums, and parameters
 4. Reports added/removed/modified items and flags breaking changes
+5. Prints a resource-level planning list: updated APIs, new APIs, and normalized AddSwagger resource candidates
 
 **Wait for the user to acknowledge the diff** before proceeding with AAZ generation or code changes.
 
@@ -73,6 +74,7 @@ Present before touching any code:
 3. Modified operations (parameter changes, response shape changes)
 4. New or removed top-level models
 5. Breaking changes (removed required fields, renamed enum values, removed operations)
+6. AddSwagger resource candidates from updated and new APIs
 
 **Wait for the user to acknowledge the diff** before proceeding with AAZ generation or code changes.
 

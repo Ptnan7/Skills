@@ -32,14 +32,14 @@ flowchart TD
         ManualExport --> GenerateCLI["generate_cli.py<br/>bump versions + generate CLI"]
     end
 
-    ExportGenerate --> ReviewCode
-    GenerateCLI --> ReviewCode
+    ExportGenerate --> RunChecks
+    GenerateCLI --> RunChecks
 
-    subgraph Validate[Review And Validate]
-        ReviewCode{{"Review git diff<br/>extension + aaz"}} --> RunChecks{"Run tests + linter now?"}
+    subgraph Validate[Validate]
+        RunChecks{"Run UT/tests + linter now?"}
         RunChecks -- Yes --> Checks["azdev test<br/>azdev linter"]
         RunChecks -- No --> SkippedChecks["Record checks skipped<br/>or run later"]
-        Checks -- Fail --> Fix["Fix generated/custom issues"] --> ReviewCode
+        Checks -- Fail --> Fix["Fix generated/custom issues"] --> RunChecks
         Checks -- Pass --> ReadyForVersion["Ready for version bump"]
         SkippedChecks --> ReadyForVersion
     end
@@ -52,14 +52,14 @@ flowchart TD
     classDef manual fill:#fff3cd,stroke:#ffc107,color:#000;
     classDef decision fill:#cfe2ff,stroke:#0d6efd,color:#000;
     class Bootstrap,Verify,Activate,Branch,Diff,StartUI,SelectResources,PolishWorkspace,ExportGenerate,GenerateCLI,Checks,Fix,ReadyForVersion,Bump script;
-    class ReviewDiff,ManualReview,ManualExport,ReviewCode manual;
+    class ReviewDiff,ManualReview,ManualExport manual;
     class CheckRepos,AutoExport,RunChecks decision;
 ```
 
 ## Legend
 
 - **Green** — scripted step (invoke the named file under `.github/cdn-cli/scripts/`)
-- **Yellow** — requires human action (review diff, click Export in the Web UI)
+- **Yellow** — requires human review, confirmation, or action before generation (review swagger diff, click Export in the Web UI)
 - **Blue** — conditional branch
 
 ## Script Index
