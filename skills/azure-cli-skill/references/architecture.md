@@ -54,7 +54,7 @@ src/front-door/
     └── tests/latest/                    # Only WAF-related tests maintained
 ```
 
-All other files (`custom.py`, `custom_waf.py`, `vendored_sdks/`, `commands.py`, `_params.py`, `_help.py`) are legacy and not maintained.
+All other files (`custom.py`, `custom_waf.py`, `vendored_sdks/`, `commands.py`, `_params.py`, `_help.py`) are legacy and not maintained. See [front-door-legacy-files-tests.md](../issues/front-door-legacy-files-tests.md).
 
 ---
 
@@ -82,4 +82,4 @@ All other files (`custom.py`, `custom_waf.py`, `vendored_sdks/`, `commands.py`, 
 ### `az network front-door` (in `src/front-door`)
 
 - `network front-door waf-policy` — maintained via AAZ (create, update, delete, show, list, managed rules, custom rules, exclusions)
-- All other classic front-door commands (`backend-pool`, `frontend-endpoint`, `probe`, `routing-rule`, `rules-engine`, etc.) are legacy and not maintained
+- All other classic front-door commands (`backend-pool`, `frontend-endpoint`, `probe`, `routing-rule`, `rules-engine`, etc.) are legacy and not maintained. See [front-door-legacy-files-tests.md](../issues/front-door-legacy-files-tests.md).

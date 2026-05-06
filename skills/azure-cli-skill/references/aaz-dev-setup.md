@@ -282,6 +282,8 @@ The script also auto-fixes common swagger example issues (e.g. `update` commands
 After resource setup, the script asks whether to Export the workspace to `aaz` and Generate CLI immediately. Answer `y` to run both steps automatically. Use `--auto-export` to force yes, or `--no-auto-export` to skip the prompt and continue with manual review/export. After CLI generation, the script asks whether to run tests and linter; use `--run-checks` to force yes, or `--no-run-checks` to skip the prompt.
 If the new swagger adds new resources/operations not in AAZ, add them to the workspace (see "Adding new resources" above).
 
+> **CDN rule-set workaround**: If the target swagger adds batch rule-set support (`RuleSetProperties.rules` / `BatchRuleProperties.ruleName`), run [CDN Rule-Set Update Drops `rules[].ruleName`](../issues/cdn-ruleset-update-drops-rule-name.md) before Export. This patches only the local `.aaz_dev` workspace cache if aaz-dev drops `rules[].ruleName` from `cdn profile rule-set update`.
+
 ### Step 4: Review and export workspace (Manual or Copilot)
 
 If you answered yes to the `auto_select_resources.py` prompt, Step 4 and Step 5 are already complete; go straight to reviewing diffs. Otherwise continue below.
@@ -301,11 +303,13 @@ requests.post("http://127.0.0.1:5000/AAZ/Editor/Workspaces/<ws-name>/Generate")
 
 This is equivalent to clicking Export in the Web UI — it writes command models and examples to the `aaz` repo.
 
-> **Export must happen before CLI generation.** The Export writes examples into the `aaz` repo. CLI generation reads from `aaz`, so examples are only preserved if Export runs first.
+> **Export must happen before CLI generation.** The Export writes examples into the `aaz` repo. CLI generation reads from `aaz`, so examples are only preserved if Export runs first. See [AAZ Export Skipped Before CLI Generation](../issues/aaz-export-before-cli-generation.md).
 
 ### Step 5: Generate CLI code (Copilot)
 
 After Export is done, **first verify the aaz repo has changes** (`git -C $env:AAZ_PATH status --short` must be non-empty), then generate. The script walks `profiles.latest`, bumps every `command.version` and `waitCommand.version` to the target, and PUTs the module back — which triggers CLI code generation.
+
+> **CDN version-pinning check**: For `--ext cdn`, do not assume every command can move to the target API. Before PUTing the module, apply [CDN Command Missing Target AAZ Model](../issues/cdn-missing-target-command-model.md) and keep commands without target AAZ command models on their existing working API.
 
 ```powershell
 # Front Door
@@ -347,19 +351,19 @@ git status; git diff --stat
 
 | Issue | Where to check | Fix |
 |-------|---------------|-----|
-| `update` command example says "Creates ..." | `:example:` docstring in `_update.py` and examples in `_update.md` | Re-run `generate_cli.py` without `--no-fix-examples`, or change to "Updates ..." manually — swagger `CreateOrUpdate` shares one example across `create`/`update` |
+| `update` command example says "Creates ..." | `:example:` docstring in `_update.py` and examples in `_update.md` | See [Generated Update Example Says Create](../issues/generated-update-example-says-create.md) |
 | Example name doesn't match command semantics | `:example:` docstrings in all generated `*.py` | Manually correct; `auto_select_resources.py` auto-fixes common cases but not all |
 | Missing examples | commands with no `:example:` | Add via Web UI or manually in the docstring |
 
 ### Step 7: Run tests (Copilot — if user says yes)
 
-**Prerequisite**: `azdev setup` must have been run to register CLI and extension repos. If `azdev test` fails with `Unable to retrieve CLI repo path from config`, run:
+**Prerequisite**: `azdev setup` must have been run to register CLI and extension repos. If `azdev test` fails with `Unable to retrieve CLI repo path from config`, see [azdev test Cannot Find CLI Repo](../issues/azdev-test-missing-setup.md) or run:
 ```powershell
 azdev setup -c cli -r extension
 ```
 This only needs to be done once per venv (it persists across terminal sessions).
 
-Run only the relevant tests (WAF for front-door, or specific test files for cdn). Legacy front-door tests (backend-pool, frontend-endpoint, routing-rule, etc.) are not maintained and may fail — ignore those.
+Run only the relevant tests (WAF for front-door, or specific test files for cdn). Legacy front-door tests (backend-pool, frontend-endpoint, routing-rule, etc.) are not maintained and may fail — ignore those. See [Front Door Legacy Files And Tests](../issues/front-door-legacy-files-tests.md).
 
 ```powershell
 # Front Door — run only WAF tests (maintained)

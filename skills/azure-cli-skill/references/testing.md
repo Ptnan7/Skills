@@ -11,7 +11,7 @@ Tests use `ScenarioTest` from `azure.cli.testsdk` with two mixin classes:
 
 ### `src/front-door`
 
-Only tests covering the AAZ-generated `waf-policy` commands are actively maintained. Legacy tests for backend pools, frontend endpoints, routing rules, probes, and rules engine are not maintained.
+Only tests covering the AAZ-generated `waf-policy` commands are actively maintained. Legacy tests for backend pools, frontend endpoints, routing rules, probes, and rules engine are not maintained. See [front-door-legacy-files-tests.md](../issues/front-door-legacy-files-tests.md).
 
 ---
 
@@ -66,4 +66,4 @@ Use `CdnScenarioMixin` helpers (`profile_create_cmd`, `endpoint_create_cmd`, `or
 
 - Test recordings live in `tests/latest/recordings/` and can be large. Only regenerate recordings when the scenario actually changes.
 - When adding a new command in `src/cdn`, add a corresponding test and run in live mode to capture a fresh recording.
-- For `src/front-door`, limit new test work to commands under `azext_front_door/aaz/` (primarily WAF policy).
+- For `src/front-door`, limit new test work to commands under `azext_front_door/aaz/` (primarily WAF policy). See [front-door-legacy-files-tests.md](../issues/front-door-legacy-files-tests.md).

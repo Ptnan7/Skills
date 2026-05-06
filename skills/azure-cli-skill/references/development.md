@@ -14,7 +14,7 @@
 
 1. Only edit files under `azext_front_door/aaz/latest/network/front_door/`
 2. Use `aaz-dev` or the Web UI — do not hand-edit generated AAZ files
-3. Do not touch `custom.py`, `custom_waf.py`, `vendored_sdks/`, `commands.py`, `_params.py`, or `_help.py` — these are legacy and not maintained
+3. Do not touch `custom.py`, `custom_waf.py`, `vendored_sdks/`, `commands.py`, `_params.py`, or `_help.py` — these are legacy and not maintained. See [front-door-legacy-files-tests.md](../issues/front-door-legacy-files-tests.md).
 
 ---
 
@@ -82,4 +82,6 @@ Exclusions for `src/cdn` live in `src/cdn/linter_exclusions.yml`.
 - **`az afd ...` vs `az network front-door ...`**: these are separate extensions (`src/cdn` and `src/front-door`). Never mix their command tables or test suites.
 - **AFD vs CDN param naming**: AFD commands typically use `--profile-name`; CDN commands may also accept `-n`. Check the existing parameter patterns before adding new ones.
 - **Rule conditions/actions** in `src/cdn` have complex nested structures. Consult `custom/custom_rule_util.py` before adding or changing rule-related commands.
-- **`src/front-door` legacy files**: if a legacy file appears to need a fix, do not modify it. Route the change through the AAZ-generated path or raise it as a known limitation.
+- **CDN rule-set batch mode can need a local aaz-dev cfg patch**: if `cdn profile rule-set update` drops `rules[].ruleName` from `instanceUpdate`, patch only the `.aaz_dev` workspace cache before Export. See [cdn-ruleset-update-drops-rule-name.md](../issues/cdn-ruleset-update-drops-rule-name.md).
+- **CDN swagger upgrades can require old API pins**: if an existing command lacks a command model for the target API, keep that command on its current API instead of adding a markdown-only version entry. See [cdn-missing-target-command-model.md](../issues/cdn-missing-target-command-model.md).
+- **`src/front-door` legacy files**: if a legacy file appears to need a fix, do not modify it. Route the change through the AAZ-generated path or raise it as a known limitation. See [front-door-legacy-files-tests.md](../issues/front-door-legacy-files-tests.md).

@@ -45,14 +45,16 @@ flowchart TD
     end
 
     ReadyForVersion --> Bump["update_history.py<br/>bump setup.py + HISTORY.rst"]
-    Bump --> Commit[["Commit changes<br/>extension + aaz"]]
-    Commit --> End([Done])
+    Bump --> AskCommit{{"Commit changes?"}}
+    AskCommit -- Yes --> Commit[["git status<br/>git commit<br/>extension + aaz"]]
+    AskCommit -- No --> End([Done])
+    Commit --> End
 
     classDef script fill:#d4edda,stroke:#28a745,color:#000;
     classDef manual fill:#fff3cd,stroke:#ffc107,color:#000;
     classDef decision fill:#cfe2ff,stroke:#0d6efd,color:#000;
     class Bootstrap,Verify,Activate,Branch,Diff,StartUI,SelectResources,PolishWorkspace,ExportGenerate,GenerateCLI,Checks,Fix,ReadyForVersion,Bump script;
-    class ReviewDiff,ManualReview,ManualExport manual;
+    class ReviewDiff,ManualReview,ManualExport,AskCommit manual;
     class CheckRepos,AutoExport,RunChecks decision;
 ```
 

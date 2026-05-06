@@ -1,14 +1,18 @@
 ---
 name: azure-pwsh-skill
-description: "Maintain CDN/AFD AutoRest-generated Azure PowerShell modules. Use when upgrading swagger, API, or PowerShell module versions; updating a .Autorest README.md, regenerating a PowerShell module from swagger, fixing autorest or build-module.ps1 failures, identifying new or removed cmdlets, adding example docs or Pester tests, or merging separate CRUD test files into a single New-* test flow. Do NOT use for Azure CLI work, non-AutoRest PowerShell changes, or unrelated repository-wide refactors."
+description: "Maintain CDN/AFD/FrontDoor AutoRest-generated Azure PowerShell modules. Use when upgrading swagger, API, or PowerShell module versions; updating a .Autorest README.md; regenerating a PowerShell module from swagger; fixing autorest or build-module.ps1 failures; identifying new or removed cmdlets; adding example docs or Pester tests; or merging separate CRUD test files into a single New-* test flow. Do NOT use for Azure CLI work, non-AutoRest PowerShell changes, or unrelated repository-wide refactors."
 argument-hint: "Describe the PowerShell task, e.g. 'update Cdn README.md and regenerate' or 'merge CRUD tests for FrontDoor routes'"
 ---
 
-# CDN PowerShell Module Maintenance
+# CDN/AFD/FrontDoor PowerShell Module Maintenance
 
 ## Overview
 
-This skill covers maintaining the CDN/AFD AutoRest-generated Azure PowerShell module (under `src/Cdn/` in the `azure-powershell` repo). Load the reference file that matches the task.
+This skill covers maintaining CDN/AFD/FrontDoor AutoRest-generated Azure PowerShell modules in the `azure-powershell` repo, including `src/Cdn/` and `src/FrontDoor/` when the task is generated-module maintenance. Load the reference file that matches the task.
+
+## Approval Protocol
+
+Ask for explicit approval before editing AutoRest configuration, editing generated or custom source files, deleting superseded test/recording files, running live Azure commands, regenerating recordings, or committing. For ordinary documentation or example edits that the user directly requested, proceed without an extra approval prompt unless the edit deletes content, regenerates content, or changes test recordings.
 
 ## Environment Setup
 

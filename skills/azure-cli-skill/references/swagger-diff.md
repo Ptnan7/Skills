@@ -25,7 +25,7 @@ The script:
 4. Reports added/removed/modified items and flags breaking changes
 5. Prints a resource-level planning list: updated APIs, new APIs, and normalized AddSwagger resource candidates
 
-**Wait for the user to acknowledge the diff** before proceeding with AAZ generation or code changes.
+**Wait for the user to acknowledge the diff** before proceeding with AAZ workspace changes, AAZ generation, or CLI code changes. This mandatory swagger-diff acknowledgement is distinct from generated-code diff review after CLI generation; do not add generated-code diff review as a required blocking gate.
 
 ---
 
