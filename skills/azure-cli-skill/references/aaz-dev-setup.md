@@ -272,14 +272,14 @@ python .github\skills\azure-cli-skill\scripts\auto_select_resources.py --ext fro
 # Non-interactive: add resources, Export AAZ, and Generate CLI in one run
 python .github\skills\azure-cli-skill\scripts\auto_select_resources.py --ext front-door --version <new-version> --auto-export
 
-# Non-interactive: add resources, Export AAZ, Generate CLI, then run tests + linter
-python .github\skills\azure-cli-skill\scripts\auto_select_resources.py --ext front-door --version <new-version> --auto-export --run-checks
+# Non-interactive: add resources, Export AAZ, Generate CLI, then run linter
+python .github\skills\azure-cli-skill\scripts\auto_select_resources.py --ext front-door --version <new-version> --auto-export --run-linter
 ```
 
 The script creates a workspace, adds resources with inheritance, fills any missing command/group short summaries, and generates swagger examples automatically. If the workspace already exists, the script still fills missing short summaries and refreshes/fixes examples instead of returning silently.
-Before AddSwagger, the script prints a resource plan with: selected existing APIs to update/add, new APIs not in AAZ, existing AAZ APIs not selected, and the final AddSwagger resource parameters grouped by version. In interactive mode, it asks whether to include any new APIs as new resources and whether to add any existing-but-unselected APIs. For non-interactive runs, use `--include-new-resources all|none` and `--include-existing-skipped all|none`.
+Before AddSwagger, the script prints a resource plan with: selected existing APIs to update/add, new APIs not in AAZ, existing AAZ APIs not selected, and the final AddSwagger resource parameters grouped by version. Known intentionally unsupported CDN resources are hidden from the new-API prompt so future swagger refreshes surface only genuinely new no-AAZ resources. In interactive mode, it asks whether to include any new APIs as new resources and whether to add any existing-but-unselected APIs. For non-interactive runs, use `--include-new-resources all|none` and `--include-existing-skipped all|none`.
 The script also auto-fixes common swagger example issues (e.g. `update` commands inheriting a "Creates ..." example name from the shared `CreateOrUpdate` swagger operation — these are rewritten to "Updates ..."). `generate_cli.py` repeats this fix after code generation as a safety net for already-exported workspaces.
-After resource setup, the script asks whether to Export the workspace to `aaz` and Generate CLI immediately. Answer `y` to run both steps automatically. Use `--auto-export` to force yes, or `--no-auto-export` to skip the prompt and continue with manual review/export. After CLI generation, the script asks whether to run tests and linter; use `--run-checks` to force yes, or `--no-run-checks` to skip the prompt.
+After resource setup, the script asks whether to Export the workspace to `aaz` and Generate CLI immediately. Answer `y` to run both steps automatically. Use `--auto-export` to force yes, or `--no-auto-export` to skip the prompt and continue with manual review/export. After CLI generation, the script asks whether to run linter; use `--run-linter` to force yes, or `--no-run-linter` to skip the prompt. Tests are not run by this workflow.
 If the new swagger adds new resources/operations not in AAZ, add them to the workspace (see "Adding new resources" above).
 
 > **CDN rule-set workaround**: If the target swagger adds batch rule-set support (`RuleSetProperties.rules` / `BatchRuleProperties.ruleName`), run [CDN Rule-Set Update Drops `rules[].ruleName`](../issues/cdn-ruleset-update-drops-rule-name.md) before Export. This patches only the local `.aaz_dev` workspace cache if aaz-dev drops `rules[].ruleName` from `cdn profile rule-set update`.
@@ -321,21 +321,21 @@ python .github\skills\azure-cli-skill\scripts\generate_cli.py --ext cdn --versio
 # Optional: Export the workspace first (same as clicking Export in Web UI), then generate
 python .github\skills\azure-cli-skill\scripts\generate_cli.py --ext front-door --version 2025-11-01 --workspace front-door-2025-11-01
 
-# Generate, then run the relevant tests + linter without prompting
-python .github\skills\azure-cli-skill\scripts\generate_cli.py --ext front-door --version 2025-11-01 --run-checks
+# Generate, then run linter without prompting
+python .github\skills\azure-cli-skill\scripts\generate_cli.py --ext front-door --version 2025-11-01 --run-linter
 
 # Dry run — show what would change without PUTing
 python .github\skills\azure-cli-skill\scripts\generate_cli.py --ext cdn --version 2025-09-01-preview --dry-run
 ```
 
 This is safe because Export already wrote examples to `aaz`. The PUT reads examples from `aaz` when generating code.
-After generation, the script asks whether to run the relevant test target and linter. For `front-door`, it runs `azdev test test_waf_scenarios` and `azdev linter front-door`. For `cdn`, it runs `azdev test cdn` and `azdev linter cdn`. Use `--run-checks` for non-interactive yes, or `--no-run-checks` to skip the prompt.
+After generation, the script asks whether to run linter. For `front-door`, it runs `azdev linter front-door`. For `cdn`, it runs `azdev linter cdn`. Use `--run-linter` for non-interactive yes, or `--no-run-linter` to skip the prompt. Tests are intentionally left to `azure-cli-test-skill`.
 
 > **Key constraint**: Always Export workspace FIRST, then Generate CLI. If you skip Export, examples will be lost. `--workspace` does the Export as part of the same command.
 
-### Step 6: Ask whether to run tests/linter (Copilot)
+### Step 6: Ask whether to run linter (Copilot)
 
-After CLI generation, do not require a generated diff review gate. Ask the user only whether to run the relevant UT/test target and linter. If the user says yes, run the checks. If the user says no, record that checks were skipped and continue to version/changelog work.
+After CLI generation, do not require a generated diff review gate. Ask the user only whether to run `azdev linter <ext>`. If the user says yes, run linter. If the user says no, record that linter was skipped and continue to version/changelog work. Do not run `azdev test` from this skill.
 
 ```powershell
 # Optional: inspect extension repo changes if needed
@@ -355,7 +355,11 @@ git status; git diff --stat
 | Example name doesn't match command semantics | `:example:` docstrings in all generated `*.py` | Manually correct; `auto_select_resources.py` auto-fixes common cases but not all |
 | Missing examples | commands with no `:example:` | Add via Web UI or manually in the docstring |
 
-### Step 7: Run tests (Copilot — if user says yes)
+### Step 7: Test workflow handoff
+
+Do not select or run `azdev test` from this swagger-upgrade skill. Tests change by API version and feature area, so hand off to `azure-cli-test-skill`, or ask the user for explicit test selection.
+
+Reference commands only:
 
 **Prerequisite**: `azdev setup` must have been run to register CLI and extension repos. If `azdev test` fails with `Unable to retrieve CLI repo path from config`, see [azdev test Cannot Find CLI Repo](../issues/azdev-test-missing-setup.md) or run:
 ```powershell

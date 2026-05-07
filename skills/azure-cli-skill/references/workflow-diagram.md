@@ -32,16 +32,17 @@ flowchart TD
         ManualExport --> GenerateCLI["generate_cli.py<br/>bump versions + generate CLI"]
     end
 
-    ExportGenerate --> RunChecks
-    GenerateCLI --> RunChecks
+    ExportGenerate --> RunLinter
+    GenerateCLI --> RunLinter
 
     subgraph Validate[Validate]
-        RunChecks{"Run UT/tests + linter now?"}
-        RunChecks -- Yes --> Checks["azdev test<br/>azdev linter"]
-        RunChecks -- No --> SkippedChecks["Record checks skipped<br/>or run later"]
-        Checks -- Fail --> Fix["Fix generated/custom issues"] --> RunChecks
-        Checks -- Pass --> ReadyForVersion["Ready for version bump"]
-        SkippedChecks --> ReadyForVersion
+        RunLinter{"Run linter now?"}
+        RunLinter -- Yes --> Linter["azdev linter"]
+        RunLinter -- No --> SkippedLinter["Record linter skipped<br/>or run later"]
+        Linter -- Fail --> Fix["Fix generated/custom issues"] --> RunLinter
+        Linter -- Pass --> TestHandoff["Hand off tests to<br/>version-specific workflow"]
+        SkippedLinter --> TestHandoff
+        TestHandoff --> ReadyForVersion["Ready for version bump"]
     end
 
     ReadyForVersion --> Bump["update_history.py<br/>bump setup.py + HISTORY.rst"]
@@ -53,9 +54,9 @@ flowchart TD
     classDef script fill:#d4edda,stroke:#28a745,color:#000;
     classDef manual fill:#fff3cd,stroke:#ffc107,color:#000;
     classDef decision fill:#cfe2ff,stroke:#0d6efd,color:#000;
-    class Bootstrap,Verify,Activate,Branch,Diff,StartUI,SelectResources,PolishWorkspace,ExportGenerate,GenerateCLI,Checks,Fix,ReadyForVersion,Bump script;
+    class Bootstrap,Verify,Activate,Branch,Diff,StartUI,SelectResources,PolishWorkspace,ExportGenerate,GenerateCLI,Linter,Fix,TestHandoff,ReadyForVersion,Bump script;
     class ReviewDiff,ManualReview,ManualExport,AskCommit manual;
-    class CheckRepos,AutoExport,RunChecks decision;
+    class CheckRepos,AutoExport,RunLinter decision;
 ```
 
 ## Legend
@@ -74,5 +75,5 @@ flowchart TD
 | [restart_aaz_dev.ps1](../scripts/restart_aaz_dev.ps1) | Launch / relaunch aaz-dev Web UI on port 5000 |
 | [swagger_diff.py](../scripts/swagger_diff.py) | Compare two swagger API versions |
 | [auto_select_resources.py](../scripts/auto_select_resources.py) | Create workspace with resources auto-selected; optionally Export AAZ + Generate CLI after prompting |
-| [generate_cli.py](../scripts/generate_cli.py) | Bump command versions + PUT to trigger CLI code gen; optionally run tests + linter after prompting |
+| [generate_cli.py](../scripts/generate_cli.py) | Bump command versions + PUT to trigger CLI code gen; optionally run linter after prompting |
 | [update_history.py](../scripts/update_history.py) | Bump `setup.py` VERSION + prepend `HISTORY.rst` entry |

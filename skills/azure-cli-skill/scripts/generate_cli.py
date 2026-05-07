@@ -37,11 +37,6 @@ BASE_URL = "http://127.0.0.1:5000"
 
 SUPPORTED_EXTS = ("cdn", "front-door")
 
-TEST_TARGETS = {
-    "cdn": "cdn",
-    "front-door": "test_waf_scenarios",
-}
-
 EXTENSION_AAZ_PATHS = {
     "cdn": ["src/cdn/azext_cdn/aaz/latest"],
     "front-door": ["src/front-door/azext_front_door/aaz/latest"],
@@ -177,21 +172,21 @@ def _get_azdev_command():
     return "azdev"
 
 
-def ask_run_checks(run_checks, no_run_checks):
-    """Return whether to run tests and linter after generation."""
-    if run_checks and no_run_checks:
-        raise ValueError("--run-checks and --no-run-checks cannot be used together")
-    if run_checks:
+def ask_run_linter(run_linter, no_run_linter):
+    """Return whether to run linter after generation."""
+    if run_linter and no_run_linter:
+        raise ValueError("run-linter and no-run-linter options cannot be used together")
+    if run_linter:
         return True
-    if no_run_checks:
+    if no_run_linter:
         return False
     if not sys.stdin.isatty():
-        print("\nSkipping test/linter prompt because stdin is not interactive.")
-        print("Use --run-checks to run tests and linter automatically.")
+        print("\nSkipping linter prompt because stdin is not interactive.")
+        print("Use --run-linter to run linter automatically.")
         return False
 
     while True:
-        answer = input("\nRun tests and linter now? [y/N]: ").strip().lower()
+        answer = input("\nRun linter now? [y/N]: ").strip().lower()
         if answer in ("", "n", "no"):
             return False
         if answer in ("y", "yes"):
@@ -199,32 +194,32 @@ def ask_run_checks(run_checks, no_run_checks):
         print("Please answer y or n.")
 
 
-def run_tests_and_linter(ext):
-    """Run the relevant azdev test target and linter for an extension."""
+def run_linter(ext):
+    """Run the relevant azdev linter for an extension."""
     azdev = _get_azdev_command()
-    test_target = TEST_TARGETS[ext]
-    commands = [
-        [azdev, "test", test_target],
-        [azdev, "linter", ext],
-    ]
-    for command in commands:
-        print(f"\nRunning: {' '.join(command)}")
-        result = subprocess.run(command, check=False)
-        if result.returncode != 0:
-            print(f"ERROR: command failed with exit code {result.returncode}: {' '.join(command)}", file=sys.stderr)
-            return False
+    command = [azdev, "linter", ext]
+    print(f"\nRunning: {' '.join(command)}")
+    result = subprocess.run(command, check=False)
+    if result.returncode != 0:
+        print(f"ERROR: command failed with exit code {result.returncode}: {' '.join(command)}", file=sys.stderr)
+        return False
     return True
 
 
-def maybe_run_checks(ext, run_checks=False, no_run_checks=False):
+def maybe_run_linter(ext, run_linter=False, no_run_linter=False):
     try:
-        should_run = ask_run_checks(run_checks, no_run_checks)
+        should_run = ask_run_linter(run_linter, no_run_linter)
     except ValueError as err:
         print(f"ERROR: {err}", file=sys.stderr)
         sys.exit(1)
 
-    if should_run and not run_tests_and_linter(ext):
+    if should_run and not run_linter(ext):
         sys.exit(1)
+
+
+def maybe_run_checks(ext, run_checks=False, no_run_checks=False):
+    """Backward-compatible alias: checks now mean linter only, never tests."""
+    maybe_run_linter(ext, run_checks, no_run_checks)
 
 
 def main():
@@ -240,10 +235,14 @@ def main():
                         help="Print what would change; do not PUT")
     parser.add_argument("--no-fix-examples", action="store_true",
                         help="Skip post-generation fix for update examples that say Create/Creates")
-    parser.add_argument("--run-checks", action="store_true",
-                        help="After generation, run the relevant azdev test target and linter without prompting")
-    parser.add_argument("--no-run-checks", action="store_true",
-                        help="After generation, skip the test/linter prompt")
+    parser.add_argument("--run-linter", action="store_true",
+                        help="After generation, run azdev linter without prompting")
+    parser.add_argument("--no-run-linter", action="store_true",
+                        help="After generation, skip the linter prompt")
+    parser.add_argument("--run-checks", dest="run_linter", action="store_true",
+                        help="Deprecated alias for --run-linter; tests are not run by this script")
+    parser.add_argument("--no-run-checks", dest="no_run_linter", action="store_true",
+                        help="Deprecated alias for --no-run-linter")
     args = parser.parse_args()
 
     if args.workspace:
@@ -276,7 +275,7 @@ def main():
     if not args.no_fix_examples:
         fix_update_examples(args.ext)
     print("Done. Review changes with: git -C $env:AAZ_CLI_EXTENSION_PATH status")
-    maybe_run_checks(args.ext, args.run_checks, args.no_run_checks)
+    maybe_run_linter(args.ext, args.run_linter, args.no_run_linter)
 
 
 if __name__ == "__main__":

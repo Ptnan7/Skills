@@ -55,10 +55,24 @@ extension\src\cdn\azext_cdn\aaz\latest\cdn\profile\deployment_version\_show.py
 extension\src\cdn\azext_cdn\aaz\latest\cdn\profile\deployment_version\_update.py
 ```
 
-Also run a syntax check:
+Also run a syntax check. Prefer VS Code/Pylance diagnostics or a direct AST parse over terminal `compileall` during large generated diffs; `compileall` can be noisy in a persistent PowerShell session and should not be wrapped with `exit $LASTEXITCODE`.
 
 ```powershell
-Push-Location extension\src\cdn
-python -m compileall -q azext_cdn
-Pop-Location
+$code = @'
+from pathlib import Path
+import ast, sys
+root = Path("extension/src/cdn/azext_cdn/aaz/latest")
+errors = []
+for path in root.rglob("*.py"):
+    try:
+        ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    except SyntaxError as exc:
+        errors.append(f"{path}:{exc.lineno}: {exc.msg}")
+if errors:
+    print("\n".join(errors))
+    sys.exit(1)
+print(f"syntax ok: {sum(1 for _ in root.rglob('*.py'))} files")
+'@
+python -c $code
+if ($LASTEXITCODE -ne 0) { throw "Syntax check failed" }
 ```

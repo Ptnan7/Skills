@@ -28,10 +28,60 @@ from base64 import b64encode
 
 import requests
 
-from generate_cli import export_workspace, fix_update_examples, get_module, maybe_run_checks, put_module, update_versions
+from generate_cli import export_workspace, fix_update_examples, get_module, maybe_run_linter, put_module, update_versions
 
 BASE_URL = "http://127.0.0.1:5000"
 PLANE = "mgmt-plane"
+
+CDN_KNOWN_NO_AAZ_RESOURCE_IDS = {
+    "/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/profiles/{}/generatessouri",
+    "/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/profiles/{}/getsupportedoptimizationtypes",
+    "/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/profiles/{}/checkresourceusage",
+    "/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/profiles/{}/endpoints/{}/checkresourceusage",
+    "/subscriptions/{}/providers/microsoft.cdn/validateprobe",
+    "/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/cdnwebapplicationfirewallpolicies",
+    "/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/cdnwebapplicationfirewallpolicies/{}",
+    "/subscriptions/{}/providers/microsoft.cdn/cdnwebapplicationfirewallmanagedrulesets",
+    "/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/checkendpointnameavailability",
+    "/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/profiles/{}/checkhostnameavailability",
+    "/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/profiles/{}/checkendpointnameavailability",
+    "/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/profiles/{}/validatesecret",
+    "/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/profiles/{}/upgrade",
+    "/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/profiles/{}/afdendpoints/{}/usages",
+    "/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/profiles/{}/afdendpoints/{}/validatecustomdomain",
+    "/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/profiles/{}/origingroups/{}/usages",
+    "/subscriptions/{}/providers/microsoft.cdn/validatesecret",
+    "/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/canmigrate",
+    "/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/migrate",
+    "/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/profiles/{}/keygroups",
+    "/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/profiles/{}/keygroups/{}",
+    "/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/profiles/{}/targetgroups",
+    "/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/profiles/{}/targetgroups/{}",
+    "/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/profiles/{}/tunnelpolicies",
+    "/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/profiles/{}/tunnelpolicies/{}",
+    "/subscriptions/{}/providers/microsoft.cdn/edgeactions",
+    "/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/edgeactions",
+    "/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/edgeactions/{}",
+    "/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/edgeactions/{}/addattachment",
+    "/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/edgeactions/{}/deleteattachment",
+    "/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/edgeactions/{}/executionfilters",
+    "/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/edgeactions/{}/executionfilters/{}",
+    "/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/edgeactions/{}/versions",
+    "/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/edgeactions/{}/versions/{}",
+    "/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/edgeactions/{}/versions/{}/deployversioncode",
+    "/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/edgeactions/{}/versions/{}/getversioncode",
+    "/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/edgeactions/{}/versions/{}/swapdefault",
+    "/subscriptions/{}/providers/microsoft.cdn/webagents",
+    "/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/webagents",
+    "/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/webagents/{}",
+    "/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/profiles/{}/agents",
+    "/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/profiles/{}/agents/{}",
+    "/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/webagents/{}/knowledgesources",
+    "/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/webagents/{}/knowledgesources/{}",
+    "/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/webagents/{}/knowledgesources/{}/purge",
+}
+
+HIDDEN_SKIP_REASONS = {"blacklisted_no_aaz", "excluded"}
 
 # Extension profiles: mod_names, resource_provider, workspace prefix, excludes
 # IMPORTANT: mod_names must match the swagger module name (used by aaz-dev internally),
@@ -43,6 +93,7 @@ EXTENSION_PROFILES = {
         "rp_name": "Microsoft.Cdn",
         "ws_prefix": "cdn",
         "exclude_patterns": ["edgeaction"],
+        "blacklist_resource_ids": CDN_KNOWN_NO_AAZ_RESOURCE_IDS,
     },
     "front-door": {
         "mod_names": "frontdoor",  # Must be swagger module name, not "front-door"
@@ -172,6 +223,7 @@ def select_resources(profile, target_version=None):
     """
     all_resources = get_rp_resources(profile)
     exclude_patterns = profile.get("exclude_patterns", [])
+    blacklist_resource_ids = set(profile.get("blacklist_resource_ids", []))
     selected = []
     skipped = []
 
@@ -185,13 +237,22 @@ def select_resources(profile, target_version=None):
                 "id": res_id,
                 "versions": available_versions[-3:] if available_versions else [],
                 "has_aaz": False,
-                "reason": "excluded",
+                "reason": "blacklisted_no_aaz" if res_id in blacklist_resource_ids else "excluded",
             })
             continue
 
         # Check AAZ for existing command models
         aaz_data = get_aaz_resource(res_id)
         aaz_versions = aaz_data.get("versions", []) if aaz_data else []
+
+        if not aaz_versions and res_id in blacklist_resource_ids:
+            skipped.append({
+                "id": res_id,
+                "versions": available_versions[-3:] if available_versions else [],
+                "has_aaz": False,
+                "reason": "blacklisted_no_aaz",
+            })
+            continue
 
         chosen_version = None
         inherit_from = None
@@ -307,9 +368,14 @@ def _ask_include_resources(title, candidates, include_mode, target_version, exis
 def finalize_selected_resources(selected, skipped, target_version, include_new, include_existing):
     """Print resource lists and optionally add skipped resources to the final AddSwagger list."""
     selected_ids = {item["id"] for item in selected}
+    hidden_skipped = [
+        item for item in skipped
+        if item.get("reason") in HIDDEN_SKIP_REASONS and item["id"] not in selected_ids
+    ]
     new_candidates = [
         item for item in skipped
         if not item.get("has_aaz") and item["id"] not in selected_ids
+        and item.get("reason") not in HIDDEN_SKIP_REASONS
     ]
     existing_unselected = [
         item for item in skipped
@@ -329,6 +395,8 @@ def finalize_selected_resources(selected, skipped, target_version, include_new, 
 
     print(f"\nNew APIs not in AAZ ({len(new_candidates)}):")
     _print_resource_items(new_candidates)
+    if hidden_skipped:
+        print(f"  Hidden known blacklisted/excluded APIs: {len(hidden_skipped)}")
     print("  Ask whether any of these need to be created as new commands/resources.")
 
     print(f"\nExisting AAZ APIs not selected ({len(existing_unselected)}):")
@@ -631,7 +699,7 @@ def maybe_export_and_generate_cli(args, ws_name):
     if should_export:
         if not export_and_generate_cli(args.ext, args.version, ws_name):
             sys.exit(1)
-        maybe_run_checks(args.ext, args.run_checks, args.no_run_checks)
+        maybe_run_linter(args.ext, args.run_linter, args.no_run_linter)
     else:
         print(f"\nOpen http://127.0.0.1:5000 to review workspace '{ws_name}'.")
         print("When ready, export manually or rerun with --auto-export.")
@@ -648,10 +716,14 @@ def main():
                         help="After resource setup, export the workspace to AAZ and generate CLI without prompting")
     parser.add_argument("--no-auto-export", action="store_true",
                         help="After resource setup, skip the Export/Generate prompt")
-    parser.add_argument("--run-checks", action="store_true",
-                        help="After auto Export/Generate, run the relevant azdev test target and linter without prompting")
-    parser.add_argument("--no-run-checks", action="store_true",
-                        help="After auto Export/Generate, skip the test/linter prompt")
+    parser.add_argument("--run-linter", action="store_true",
+                        help="After auto Export/Generate, run azdev linter without prompting")
+    parser.add_argument("--no-run-linter", action="store_true",
+                        help="After auto Export/Generate, skip the linter prompt")
+    parser.add_argument("--run-checks", dest="run_linter", action="store_true",
+                        help="Deprecated alias for --run-linter; tests are not run by this script")
+    parser.add_argument("--no-run-checks", dest="no_run_linter", action="store_true",
+                        help="Deprecated alias for --no-run-linter")
     parser.add_argument("--include-new-resources", choices=("all", "none"), default=None,
                         help="Whether to include new resources that have no AAZ history without prompting")
     parser.add_argument("--include-existing-skipped", choices=("all", "none"), default=None,
@@ -674,8 +746,11 @@ def main():
         print(f"  [+] {r['id']}")
         print(f"      version: {r['version']}  ({r['reason']})")
 
-    print(f"\n=== SKIPPED: {len(skipped)} resources ===")
-    for r in skipped:
+    visible_skipped = [r for r in skipped if r.get("reason") not in HIDDEN_SKIP_REASONS]
+    hidden_skipped = len(skipped) - len(visible_skipped)
+    print(f"\n=== SKIPPED: {len(visible_skipped)} visible resources ===")
+    print(f"  Hidden known blacklisted/excluded APIs: {hidden_skipped}")
+    for r in visible_skipped:
         print(f"  [-] {r['id']}")
         print(f"      versions: {r['versions']}  aaz: {r['has_aaz']}")
 
