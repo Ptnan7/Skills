@@ -34,6 +34,8 @@ This skill covers two extensions in the `azure-cli-extensions` repo:
 | [front-door-legacy-files-tests.md](issues/front-door-legacy-files-tests.md) | Front Door work touches legacy files or legacy non-WAF tests fail. |
 | [cdn-ruleset-update-drops-rule-name.md](issues/cdn-ruleset-update-drops-rule-name.md) | aaz-dev drops `rules[].ruleName` from `cdn profile rule-set update` `instanceUpdate` cfg. |
 | [cdn-missing-target-command-model.md](issues/cdn-missing-target-command-model.md) | CDN generation fails because a command lacks a target API AAZ command model and must stay on its old API. |
+| [cdn-custom-arg-conflicts-generated.md](issues/cdn-custom-arg-conflicts-generated.md) | `azdev linter cdn` fails with `AAZConflictFieldDefinitionError` because a custom class re-defines args that the new generated schema already includes. |
+| [azdev-linter-invalid-git-repo.md](issues/azdev-linter-invalid-git-repo.md) | `azdev linter` exits code 1 with `invalid git repo: None` even though all static lint rules passed. |
 
 ## Quick Reference — Swagger Upgrade
 

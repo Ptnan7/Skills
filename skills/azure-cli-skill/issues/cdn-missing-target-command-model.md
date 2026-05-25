@@ -18,6 +18,20 @@ Do not blindly force every CDN/AFD command to the target API. Before PUTing the 
 
 Do not add a markdown-only version entry unless the linked resource cfg really contains the command model. A markdown entry without a real cfg command model can still fail generation.
 
+## Known 2025-09-01-preview Pins
+
+During the CDN `2025-09-01-preview` refresh, these commands intentionally stayed on older APIs:
+
+| Command | Pinned API | Reason |
+|---------|------------|--------|
+| `afd profile log-scrubbing show` | `2025-06-01` | No `2025-09-01-preview` command model exists; the profile resource cfg contains `properties.logScrubbing` as a flat field but no nested `log-scrubbing` command group or command model. |
+
+Expected non-target API hit after generation:
+
+```text
+extension\src\cdn\azext_cdn\aaz\latest\afd\profile\log_scrubbing\_show.py
+```
+
 ## Known 2025-12-01 Pins
 
 During the CDN stable `2025-12-01` refresh, these commands intentionally stayed on older APIs:
