@@ -675,12 +675,23 @@ def export_and_generate_cli(ext, version, ws_name):
         print("ERROR: module has no 'profiles.latest' node; Export may have failed.", file=sys.stderr)
         return False
 
+    from generate_cli import PINNED_COMMAND_VERSIONS
+
+    pinned_versions = PINNED_COMMAND_VERSIONS.get((ext, version), {})
     counts = {"commands_total": 0, "commands_changed": 0, "wait_changed": 0}
-    update_versions(latest, version, counts)
+    update_versions(latest, version, counts, pinned_versions)
     print(f"Commands in module: {counts['commands_total']}")
     print(f"  version changes:  {counts['commands_changed']}")
     print(f"  waitCommand changes: {counts['wait_changed']}")
     print(f"  target version:   {version}")
+    if counts.get("commands_pinned"):
+        print("  pinned commands:")
+        for command_path, pinned_version in sorted(counts["commands_pinned"].items()):
+            print(f"    {command_path}: {pinned_version}")
+    if counts.get("wait_pinned"):
+        print("  pinned waitCommands:")
+        for command_path, pinned_version in sorted(counts["wait_pinned"].items()):
+            print(f"    {command_path}: {pinned_version}")
 
     print(f"PUT {BASE_URL}/CLI/Az/Extension/Modules/{ext} (triggers code generation)...")
     put_module(ext, data)

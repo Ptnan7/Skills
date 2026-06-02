@@ -47,6 +47,17 @@ COMMAND_MODEL_PATHS = {
     "front-door": ["Commands/network/front-door"],
 }
 
+PINNED_COMMAND_VERSIONS = {
+    ("cdn", "2025-12-01"): {
+        "afd profile log-scrubbing show": "2025-06-01",
+        "cdn profile deployment-version approve": "2025-09-01-preview",
+        "cdn profile deployment-version compare": "2025-09-01-preview",
+        "cdn profile deployment-version list": "2025-09-01-preview",
+        "cdn profile deployment-version show": "2025-09-01-preview",
+        "cdn profile deployment-version update": "2025-09-01-preview",
+    },
+}
+
 UPDATE_EXAMPLE_PATTERNS = {
     ".py": re.compile(r"(?P<prefix>\s*:example:\s+)(?P<verb>Creates?|creates?)(?P<rest>\b.*)"),
     ".md": re.compile(r"(?P<prefix>\s*-\s+)(?P<verb>Creates?|creates?)(?P<rest>\b.*)"),
@@ -80,23 +91,32 @@ def put_module(ext, data):
         sys.exit(1)
 
 
-def update_versions(node, new_version, counts):
-    """Recursively set every command.version and waitCommand.version to new_version."""
+def update_versions(node, new_version, counts, pinned_versions=None, path=()):
+    """Recursively set command versions, preserving known pins without target models."""
+    pinned_versions = pinned_versions or {}
     if "commandGroups" in node and node["commandGroups"]:
-        for group in node["commandGroups"].values():
-            update_versions(group, new_version, counts)
+        for group_name, group in node["commandGroups"].items():
+            update_versions(group, new_version, counts, pinned_versions, (*path, group_name))
     if "commands" in node and node["commands"]:
-        for cmd in node["commands"].values():
+        for command_name, cmd in node["commands"].items():
+            command_path = " ".join((*path, command_name))
+            target_version = pinned_versions.get(command_path, new_version)
             if "version" in cmd:
-                if cmd["version"] != new_version:
+                if cmd["version"] != target_version:
                     counts["commands_changed"] += 1
-                cmd["version"] = new_version
+                cmd["version"] = target_version
+                if target_version != new_version:
+                    counts.setdefault("commands_pinned", {})[command_path] = target_version
             counts["commands_total"] += 1
     if "waitCommand" in node and isinstance(node["waitCommand"], dict):
+        wait_command_path = " ".join((*path, "wait"))
+        target_version = pinned_versions.get(wait_command_path, new_version)
         if "version" in node["waitCommand"]:
-            if node["waitCommand"]["version"] != new_version:
+            if node["waitCommand"]["version"] != target_version:
                 counts["wait_changed"] += 1
-            node["waitCommand"]["version"] = new_version
+            node["waitCommand"]["version"] = target_version
+            if target_version != new_version:
+                counts.setdefault("wait_pinned", {})[wait_command_path] = target_version
 
 
 def _update_verb(verb):
@@ -213,7 +233,7 @@ def maybe_run_linter(ext, run_linter=False, no_run_linter=False):
         print(f"ERROR: {err}", file=sys.stderr)
         sys.exit(1)
 
-    if should_run and not run_linter(ext):
+    if should_run and not globals()["run_linter"](ext):
         sys.exit(1)
 
 
@@ -258,13 +278,22 @@ def main():
         print("ERROR: module has no 'profiles.latest' node; did Export run?", file=sys.stderr)
         sys.exit(1)
 
+    pinned_versions = PINNED_COMMAND_VERSIONS.get((args.ext, args.version), {})
     counts = {"commands_total": 0, "commands_changed": 0, "wait_changed": 0}
-    update_versions(latest, args.version, counts)
+    update_versions(latest, args.version, counts, pinned_versions)
 
     print(f"Commands in module: {counts['commands_total']}")
     print(f"  version changes:  {counts['commands_changed']}")
     print(f"  waitCommand changes: {counts['wait_changed']}")
     print(f"  target version:   {args.version}")
+    if counts.get("commands_pinned"):
+        print("  pinned commands:")
+        for command_path, pinned_version in sorted(counts["commands_pinned"].items()):
+            print(f"    {command_path}: {pinned_version}")
+    if counts.get("wait_pinned"):
+        print("  pinned waitCommands:")
+        for command_path, pinned_version in sorted(counts["wait_pinned"].items()):
+            print(f"    {command_path}: {pinned_version}")
 
     if args.dry_run:
         print("Dry-run: skipping PUT.")
