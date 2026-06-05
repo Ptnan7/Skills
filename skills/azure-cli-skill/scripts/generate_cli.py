@@ -48,6 +48,9 @@ COMMAND_MODEL_PATHS = {
 }
 
 PINNED_COMMAND_VERSIONS = {
+    ("cdn", "2025-09-01-preview"): {
+        "afd profile log-scrubbing show": "2025-06-01",
+    },
     ("cdn", "2025-12-01"): {
         "afd profile log-scrubbing show": "2025-06-01",
         "cdn profile deployment-version approve": "2025-09-01-preview",

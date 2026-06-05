@@ -72,12 +72,14 @@ Avoid broad CRUD rewrites when one focused test or one extension to an existing 
 After edits, propose exact commands but do not run them until approved. Examples:
 
 ```powershell
-azdev test test_afd_rule_scenarios::CdnAfdRuleScenarioTest::test_rule_set_batch_mode
-azdev test test_waf_scenarios::WafTests::test_waf_policy_managed_rules_sensitivity
+azdev test test_afd_rule_crud --profile latest
+azdev test test_waf_policy_managed_rules_sensitivity --profile latest
 ```
+
+Use azdev discovery keys such as method, class, or test file names. Do not pass raw pytest `::` paths as `<TESTS>` unless you have verified the local azdev version accepts them.
 
 Ask separately for live mode or recording generation:
 
 ```powershell
-azdev test test_afd_rule_scenarios::CdnAfdRuleScenarioTest::test_rule_set_batch_mode --live
+azdev test test_afd_rule_crud --profile latest --live
 ```
