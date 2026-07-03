@@ -4,9 +4,9 @@ Before updating AAZ-generated code for a new API version, compare the old and ne
 
 ---
 
-## Quick Diff with Script (Preferred)
+## Quick Diff With Shared Skill (Preferred)
 
-Use the automated diff script to compare two API versions. Requires `AAZ_SWAGGER_PATH` (set by `use_aaz_dev_env.ps1`).
+Load and follow the `azure-edge-swagger-diff` skill to compare two API versions. Requires `AAZ_SWAGGER_PATH` (set by `use_aaz_dev_env.ps1`) unless `--swagger-path` is supplied.
 
 ```powershell
 . .github\skills\azure-cli-skill\scripts\use_aaz_dev_env.ps1
@@ -24,6 +24,7 @@ The script:
 3. Compares operations, models, enums, and parameters
 4. Reports added/removed/modified items and flags breaking changes
 5. Prints a resource-level planning list: updated APIs, new APIs, and normalized AddSwagger resource candidates
+6. Saves the same report to `swagger-diffs/<ext>/<old-version>_to_<new-version>.md`
 
 **Wait for the user to acknowledge the diff** before proceeding with AAZ workspace changes, AAZ generation, or CLI code changes. This mandatory swagger-diff acknowledgement is distinct from generated-code diff review after CLI generation; do not add generated-code diff review as a required blocking gate.
 

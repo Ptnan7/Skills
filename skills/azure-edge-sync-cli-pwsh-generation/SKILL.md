@@ -21,14 +21,15 @@ Before editing or generating, identify:
 
 ## Workflow
 
-1. Load and follow `azure-cli-skill` for CLI/AAZ generation steps.
-2. Load and follow `azure-pwsh-skill` for PowerShell AutoRest generation steps.
-3. Generate both sides from the same swagger version or explicitly record why versions differ.
-4. If generating a new API/module version, update the corresponding docs/help/examples for each generated side and run the relevant build/generation command before comparing results.
-5. After generation completes, collect `git status --short` and focused diffs from both repos:
+1. Load and follow `azure-edge-swagger-diff` first. Save the diff under `swagger-diffs/` and wait for user acknowledgement before either generation path.
+2. Load and follow `azure-cli-skill` for CLI/AAZ generation steps, using the saved swagger diff as the planning artifact.
+3. Load and follow `azure-pwsh-skill` for PowerShell AutoRest generation steps, using the same saved swagger diff as the planning artifact.
+4. Generate both sides from the same swagger version or explicitly record why versions differ.
+5. If generating a new API/module version, update the corresponding docs/help/examples for each generated side and run the relevant build/generation command before comparing results.
+6. After generation completes, collect `git status --short` and focused diffs from both repos:
    - `extension` and `aaz` for CLI.
    - `pwsh` for PowerShell.
-6. Compare generated changes across repos before declaring either side complete.
+7. Compare generated changes across repos before declaring either side complete.
 
 ## Cross-Repo Comparison Checklist
 
@@ -68,5 +69,6 @@ When summarizing, include:
 
 - Branches and commits for each repo touched.
 - The swagger version/commit used by each side.
+- The saved swagger diff path used as the shared planning artifact.
 - A short cross-tool comparison table: CLI exposed, PowerShell exposed, discrepancy, resolution.
 - Validation commands run and their pass/fail counts.

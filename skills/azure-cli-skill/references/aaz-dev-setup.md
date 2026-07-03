@@ -234,21 +234,14 @@ git checkout -b <branch-name>
 
 ### Step 2: Compare swagger versions (Copilot)
 
-Run the swagger diff script to compare old vs new versions:
+Load and follow the `azure-edge-swagger-diff` skill before creating or editing an AAZ workspace. It runs the shared diff script, prints the comparison, and saves the report under `swagger-diffs/<ext>/<old-version>_to_<new-version>.md` for later generation and test planning.
 
-```powershell
-# Front Door example
-python .github\skills\azure-cli-skill\scripts\swagger_diff.py --ext front-door --old <old-version> --new <new-version>
-
-# CDN example
-python .github\skills\azure-cli-skill\scripts\swagger_diff.py --ext cdn --old <old-version> --new <new-version>
-```
-
-The script parses the swagger `readme.md`, loads all JSON files for each tag, and reports:
+The saved diff reports:
 - New/removed/modified operations
 - New/removed/modified models and properties
 - Enum value changes
 - Breaking changes summary
+- Updated/new API resource candidates for AddSwagger
 
 Review the output before proceeding. Key areas to watch:
 - LRO pattern changes (`final-state-via`)

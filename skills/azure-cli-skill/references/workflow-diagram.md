@@ -12,7 +12,7 @@ flowchart TD
         Bootstrap --> Activate["use_aaz_dev_env.ps1<br/>activate env + AAZ_* paths"]
         Verify --> Activate
         Activate --> Branch["Create feature branches<br/>extension + aaz"]
-        Branch --> Diff["swagger_diff.py<br/>old version -> new version"]
+        Branch --> Diff["azure-edge-swagger-diff<br/>save swagger-diffs artifact"]
     end
 
     Diff --> ReviewDiff{{"Review swagger diff<br/>continue?"}}
@@ -73,7 +73,7 @@ flowchart TD
 | [check_repos.ps1](../scripts/check_repos.ps1) | Lightweight verify that 4 repos exist (no clone) |
 | [use_aaz_dev_env.ps1](../scripts/use_aaz_dev_env.ps1) | Activate venv + export env vars in a new terminal |
 | [restart_aaz_dev.ps1](../scripts/restart_aaz_dev.ps1) | Launch / relaunch aaz-dev Web UI on port 5000 |
-| [swagger_diff.py](../scripts/swagger_diff.py) | Compare two swagger API versions |
+| [swagger_diff.py](../scripts/swagger_diff.py) | Shared implementation used by `azure-edge-swagger-diff`; compares versions and saves a diff report |
 | [auto_select_resources.py](../scripts/auto_select_resources.py) | Create workspace with resources auto-selected; optionally Export AAZ + Generate CLI after prompting |
 | [generate_cli.py](../scripts/generate_cli.py) | Bump command versions + PUT to trigger CLI code gen; optionally run linter after prompting |
 | [update_history.py](../scripts/update_history.py) | Bump `setup.py` VERSION + prepend `HISTORY.rst` entry |

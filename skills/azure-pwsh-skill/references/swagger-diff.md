@@ -4,9 +4,9 @@ Before updating a module, compare the old and new swagger to understand which AP
 
 ---
 
-## Quick Diff with Script (Preferred)
+## Quick Diff With Shared Skill (Preferred)
 
-Use the shared diff script (from `azure-cli-skill`). Requires `AAZ_SWAGGER_PATH` (set by `use_pwsh_env.ps1`).
+Load and follow the `azure-edge-swagger-diff` skill. It uses the shared diff script and requires `AAZ_SWAGGER_PATH` (set by `use_pwsh_env.ps1`) unless `--swagger-path` is supplied.
 
 ```powershell
 . .github\skills\azure-pwsh-skill\scripts\use_pwsh_env.ps1
@@ -23,6 +23,8 @@ The script parses the swagger `readme.md`, loads all JSON files for each tag, an
 - New/removed/modified models and properties
 - Enum value changes
 - Breaking changes summary
+
+By default it also saves the same report to `swagger-diffs/<ext>/<old-version>_to_<new-version>.md`; use that file as the handoff artifact for AutoRest, custom wrapper, docs/help, and test planning.
 
 **Wait for the user to acknowledge the diff** before proceeding with code changes.
 

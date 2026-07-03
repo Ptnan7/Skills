@@ -48,7 +48,7 @@ This sets `$env:PWSH_REPO_PATH` and `$env:AAZ_SWAGGER_PATH` for scripts and comm
 
 1. **Initialize environment** — run `initialize_pwsh_env.ps1` (Copilot)
 2. **Activate environment** — run `use_pwsh_env.ps1` in every new terminal
-3. **Diff swagger** — run `python .github\skills\azure-cli-skill\scripts\swagger_diff.py --ext cdn --old <old-ver> --new <new-ver>` (shared with azure-cli-skill)
+3. **Diff swagger** — load and follow the `azure-edge-swagger-diff` skill. It runs the shared diff script and saves the report under `swagger-diffs/` for later AutoRest, custom wrapper, docs/help, and test planning.
 4. **Update README.md** — update commit hash / API version / directives in `.Autorest/README.md` (see [autorest-generation.md](references/autorest-generation.md))
 5. **Run autorest** — `autorest` from the `.Autorest/` directory
 6. **Review custom code** — check if `custom/` files reference changed models, renamed properties, removed types, or public wrappers for regenerated `internal/*.ps1` cmdlets. When an internal generated cmdlet changes, update the matching `custom/*.ps1` wrapper parameters and `process` forwarding logic if needed. Do not manually edit `custom/autogen-model-cmdlets`; regenerate those object helper files instead. Present findings to the user and wait for approval before editing. See [autorest-generation.md](references/autorest-generation.md) Step 3.
@@ -65,7 +65,8 @@ This sets `$env:PWSH_REPO_PATH` and `$env:AAZ_SWAGGER_PATH` for scripts and comm
 |------|----------|
 | [workflow-diagram.md](references/workflow-diagram.md) | Mermaid flowchart of the full module-maintenance workflow |
 | [architecture.md](references/architecture.md) | Module location, directory structure, key commands |
-| [swagger-diff.md](references/swagger-diff.md) | Compare old vs new swagger (local or GitHub) before updating |
+| `azure-edge-swagger-diff` skill | Compare old vs new swagger and save `swagger-diffs/<ext>/<old>_to_<new>.md` before generation/test planning |
+| [swagger-diff.md](references/swagger-diff.md) | PowerShell-specific interpretation after the shared swagger diff |
 | [autorest-generation.md](references/autorest-generation.md) | Update README.md config, run autorest, build module, error-fixing rules |
 | [development.md](references/development.md) | Identify new/removed cmdlets, update example documentation |
 | [testing.md](references/testing.md) | Add Pester tests, run tests, merge CRUD tests into New-* files |

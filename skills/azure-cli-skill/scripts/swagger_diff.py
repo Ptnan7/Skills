@@ -13,6 +13,9 @@ Usage:
     python swagger_diff.py --ext cdn --old 2024-02-01 --new 2025-09-01-preview
     python swagger_diff.py --ext cdn --old 2024-02-01 --new 2025-09-01-preview --swagger-path C:\repos\azure-rest-api-specs
 
+By default, the printed diff is also saved under ./swagger-diffs/<ext>/
+for later CLI generation, PowerShell generation, and test planning.
+
 Swagger repo resolution order:
   1. --swagger-path CLI argument
   2. AAZ_SWAGGER_PATH environment variable
@@ -20,6 +23,8 @@ Swagger repo resolution order:
 """
 
 import argparse
+from contextlib import redirect_stdout
+from io import StringIO
 import json
 import os
 import re
@@ -151,6 +156,39 @@ def extract_operations(paths):
 def swagger_path_to_resource_id(path):
     """Convert a swagger path to the normalized AAZ resource id shape."""
     return re.sub(r"\{[^}]+\}", "{}", path).lower()
+
+
+def sanitize_filename_part(value):
+    """Keep generated diff filenames stable across shells and platforms."""
+    return re.sub(r"[^A-Za-z0-9_.-]+", "-", value).strip("-")
+
+
+def resolve_output_dir(output_dir_arg, ext):
+    """Resolve the swagger diff output folder under the current workspace root by default."""
+    base_dir = Path(output_dir_arg) if output_dir_arg else Path.cwd() / "swagger-diffs"
+    return base_dir / sanitize_filename_part(ext)
+
+
+def save_report(report_text, args, old_tag, new_tag, old_files, new_files):
+    """Persist the human-readable swagger diff for later generation and test planning."""
+    output_dir = resolve_output_dir(args.output_dir, args.ext)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / f"{sanitize_filename_part(args.old)}_to_{sanitize_filename_part(args.new)}.md"
+
+    content = (
+        f"# Swagger Diff: {args.ext} {args.old} -> {args.new}\n\n"
+        f"- Extension: `{args.ext}`\n"
+        f"- Old version: `{args.old}`\n"
+        f"- New version: `{args.new}`\n"
+        f"- Old tag: `{old_tag}`\n"
+        f"- New tag: `{new_tag}`\n"
+        f"- Old input files: {', '.join(f'`{item}`' for item in old_files)}\n"
+        f"- New input files: {', '.join(f'`{item}`' for item in new_files)}\n\n"
+        "---\n\n"
+        f"{report_text}"
+    )
+    output_path.write_text(content, encoding="utf-8")
+    return output_path
 
 
 def _print_operation_resource_list(title, items, op_lookup=None):
@@ -399,6 +437,10 @@ def main():
     parser.add_argument("--new", required=True, help="New API version (e.g. 2025-11-01, 2025-09-01-preview)")
     parser.add_argument("--swagger-path", default=None,
                         help="Local path to azure-rest-api-specs clone (overrides AAZ_SWAGGER_PATH)")
+    parser.add_argument("--output-dir", default=None,
+                        help="Directory for persisted diff reports (default: ./swagger-diffs)")
+    parser.add_argument("--no-save", action="store_true",
+                        help="Print the diff only; do not write a report file")
     args = parser.parse_args()
 
     profile = EXTENSION_PROFILES[args.ext]
@@ -424,9 +466,6 @@ def main():
         print(f"  Available tags: {', '.join(sorted(tags.keys()))}", file=sys.stderr)
         sys.exit(1)
 
-    print(f"Old tag: {old_tag} -> files: {tags[old_tag]}")
-    print(f"New tag: {new_tag} -> files: {tags[new_tag]}")
-
     old_schema = load_swagger_files(spec_dir, tags[old_tag])
     new_schema = load_swagger_files(spec_dir, tags[new_tag])
 
@@ -442,13 +481,23 @@ def main():
     new_enums = extract_enum_values(new_schema["definitions"])
     enum_changes = diff_enums(old_enums, new_enums)
 
-    print_report(
-        args.old, args.new,
-        ops_added, ops_removed, ops_modified,
-        models_added, models_removed, models_modified,
-        enum_changes,
-    )
-    print_resource_plan(new_ops, ops_added, ops_modified)
+    report_buffer = StringIO()
+    with redirect_stdout(report_buffer):
+        print(f"Old tag: {old_tag} -> files: {tags[old_tag]}")
+        print(f"New tag: {new_tag} -> files: {tags[new_tag]}")
+        print_report(
+            args.old, args.new,
+            ops_added, ops_removed, ops_modified,
+            models_added, models_removed, models_modified,
+            enum_changes,
+        )
+        print_resource_plan(new_ops, ops_added, ops_modified)
+
+    report_text = report_buffer.getvalue()
+    print(report_text, end="")
+    if not args.no_save:
+        output_path = save_report(report_text, args, old_tag, new_tag, tags[old_tag], tags[new_tag])
+        print(f"\nSaved swagger diff: {output_path}")
 
 
 if __name__ == "__main__":
