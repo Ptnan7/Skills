@@ -1,7 +1,7 @@
 ---
 name: azure-cli-aaz-property-subcommands
-description: "Upgrade or repair Azure CLI AAZ property subcommands generated from nested resource properties, such as afd profile log-scrubbing show/create/update/delete. Use when a CDN/AFD command is pinned to an old API because it is a property subcommand, when the target swagger resource contains the property but the AAZ command markdown lacks the target version, or when Web UI-generated subcommands need to be refreshed for a new stable API. Do NOT use for ordinary swagger operation commands or scenario tests."
-argument-hint: "Describe the property subcommand and target API, e.g. 'upgrade afd profile log-scrubbing show to 2025-12-01'"
+description: "Generate, upgrade, or repair Azure CLI AAZ property/subresource subcommands carved from nested resource properties, such as afd profile log-scrubbing show/create/update/delete or network front-door waf-policy managed-rules exception add/list/remove. Use when a CDN/AFD/Front Door command is pinned to an old API because it is a property subcommand, when a target swagger resource contains the property but AAZ command markdown lacks the target version, or when Web UI-generated subcommands need to be created/refreshed for a new stable API. Do NOT use for ordinary swagger operation commands or scenario tests."
+argument-hint: "Describe the property/subresource command and target API, e.g. 'generate front-door waf-policy managed-rules exception add/list/remove for 2025-11-01'"
 ---
 
 # Azure CLI AAZ Property Subcommands
@@ -28,6 +28,7 @@ Do not treat them as missing swagger operations. First check whether the target 
 Use this skill when any of these signals appear:
 
 - `generate_cli.py` or `auto_select_resources.py` pins a command because the target version is missing.
+- A user asks to add CLI subcommands for a nested property, for example `az network front-door waf-policy managed-rules exception add/list/remove`, and the parent create/update command already exposes the full nested object as an argument.
 - A command markdown under `aaz/Commands/...` has old versions but lacks the target version.
 - The target resource cfg under `aaz/Resources/.../<target-version>.xml` contains the nested property and args/props.
 - The extension has generated parent commands with the nested property, but a separate child command still points at an old API.
@@ -47,6 +48,31 @@ During the CDN `2025-12-01` stable refresh, `afd profile log-scrubbing show` loo
 
 In that state, the correct next step is not to keep the pin forever. Instead, refresh or recreate the property subcommand in AAZ so its markdown/model has the target API version, then remove the old pin and regenerate CLI.
 
+## Current Example: Front Door WAF Managed Rule Exceptions
+
+Classic Front Door WAF policy has `exceptionsList` under `managedRules`. A user may expect commands like:
+
+```text
+az network front-door waf-policy managed-rules exception add
+az network front-door waf-policy managed-rules exception list
+az network front-door waf-policy managed-rules exception remove
+```
+
+This is a property/subresource command set, not a standalone swagger operation. The parent resource is:
+
+```text
+/subscriptions/{}/resourcegroups/{}/providers/microsoft.network/frontdoorwebapplicationfirewallpolicies/{}
+```
+
+For API `2025-11-01`, the resource cfg contains:
+
+```text
+properties.managedRules.exceptionsList.exceptions[]
+$parameters.properties.managedRules.exceptionsList.exceptions
+```
+
+Generate it through the AAZ Web UI/workspace APIs, then export and generate the `front-door` extension. Do not implement it in `src/front-door` legacy files such as `custom_waf.py`, `commands.py`, `_params.py`, or `_help.py`.
+
 ## Required Workflow
 
 1. **Classify the command.** Confirm whether the pinned command is a property subcommand. Look for markdown comments ending with a property path, for example `properties.logScrubbing`.
@@ -64,6 +90,153 @@ In that state, the correct next step is not to keep the pin forever. Instead, re
 6. **Remove stale pins.** Remove the command from `PINNED_COMMAND_VERSIONS` only after the AAZ command markdown has a real target-version entry and the linked resource cfg contains the property command model.
 7. **Generate CLI.** Run the normal generation flow from `azure-cli-skill`.
 8. **Validate.** Confirm the generated Python uses the target API, then run syntax checks and linter.
+
+## Generate New Subresource Commands
+
+Use this workflow when the parent command model exists and the goal is to create a new subcommand group from a nested property.
+
+1. **Start the AAZ Web UI.**
+    ```powershell
+    & .github\skills\azure-cli-skill\scripts\restart_aaz_dev.ps1
+    ```
+2. **Create or open a workspace containing the parent resource.** Prefer the Web UI. The equivalent API flow is useful for repeatable runs:
+    ```powershell
+    $base = 'http://127.0.0.1:5000'
+    $ws = 'front-door-waf-exceptions-2025-11-01'
+    $resourceId = '/subscriptions/{}/resourcegroups/{}/providers/microsoft.network/frontdoorwebapplicationfirewallpolicies/{}'
+    $version = '2025-11-01'
+
+    Invoke-RestMethod -Method Post -Uri "$base/AAZ/Editor/Workspaces" `
+       -ContentType 'application/json' `
+       -Body (@{ name = $ws; plane = 'mgmt-plane'; modNames = 'frontdoor'; resourceProvider = 'Microsoft.Network'; source = 'OpenAPI' } | ConvertTo-Json)
+
+    Invoke-RestMethod -Method Post -Uri "$base/AAZ/Editor/Workspaces/$ws/CommandTree/Nodes/aaz/AddSwagger" `
+       -ContentType 'application/json' `
+       -Body (@{ module = 'frontdoor'; version = $version; resources = @(@{ id = $resourceId; options = @{ aaz_version = $version } }) } | ConvertTo-Json -Depth 8)
+    ```
+3. **Find the nested property arg var.** Inspect the target resource XML for the parent update command. For Front Door WAF exceptions:
+    ```powershell
+    rg 'exceptionsList|var="[^"]*exceptions' aaz\Resources\mgmt-plane\**\2025-11-01.xml
+    ```
+    Use the collection arg, not a child scalar arg:
+    ```text
+    $parameters.properties.managedRules.exceptionsList.exceptions
+    ```
+4. **Create subresource commands from the arg.** This is the Web UI's subresource-generation action:
+    ```powershell
+    $encodedResource = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($resourceId))
+    $encodedVersion = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($version))
+
+    Invoke-RestMethod -Method Post `
+       -Uri "$base/AAZ/Editor/Workspaces/$ws/Resources/$encodedResource/V/$encodedVersion/Subresources" `
+       -ContentType 'application/json' `
+       -Body (@{
+          arg = '$parameters.properties.managedRules.exceptionsList.exceptions'
+          commandGroupName = 'network front-door waf-policy managed-rules exception'
+       } | ConvertTo-Json)
+    ```
+    If matching an existing command surface, pass `refArgsOptions` to preserve argument option names from the reference commands.
+5. **Inspect generated commands before export.**
+    ```powershell
+    Invoke-RestMethod -Method Get `
+       -Uri "$base/AAZ/Editor/Workspaces/$ws/CommandTree/Nodes/aaz/network/front-door/waf-policy/managed-rules/exception" |
+       ConvertTo-Json -Depth 10
+    ```
+    Array subresources commonly generate `create`, `delete`, `list`, `show`, and `update` by default. If the desired CLI surface is `add/remove`, rename through the Web UI or use the API. The rename body must contain the full command path, not only the final verb:
+    ```powershell
+    Invoke-RestMethod -Method Post `
+       -Uri "$base/AAZ/Editor/Workspaces/$ws/CommandTree/Nodes/aaz/network/front-door/waf-policy/managed-rules/exception/Leaves/create/Rename" `
+       -ContentType 'application/json' `
+       -Body '{"name":"network front-door waf-policy managed-rules exception add"}'
+
+    Invoke-RestMethod -Method Post `
+       -Uri "$base/AAZ/Editor/Workspaces/$ws/CommandTree/Nodes/aaz/network/front-door/waf-policy/managed-rules/exception/Leaves/delete/Rename" `
+       -ContentType 'application/json' `
+       -Body '{"name":"network front-door waf-policy managed-rules exception remove"}'
+    ```
+6. **Export the workspace.** This is equivalent to clicking **EXPORT** in the Web UI:
+    ```powershell
+    Invoke-RestMethod -Method Post -Uri "$base/AAZ/Editor/Workspaces/$ws/Generate"
+    ```
+7. **Register the new command surface in the CLI extension module.** AAZ Export creates command models in the `aaz` repo, but the extension generator only emits commands present in the extension module JSON. For brand-new subcommands, add the desired command group/commands to `/CLI/Az/Extension/Modules/<ext>` before the final `PUT`. For Front Door WAF exception `add/list/remove`:
+    ```powershell
+    $module = (Invoke-WebRequest -UseBasicParsing -Uri "$base/CLI/Az/Extension/Modules/front-door").Content |
+       ConvertFrom-Json -AsHashtable
+
+    $waf = $module['profiles']['latest']['commandGroups']['network']['commandGroups']['front-door']['commandGroups']['waf-policy']
+    if (-not $waf.ContainsKey('commandGroups')) { $waf['commandGroups'] = @{} }
+    if (-not $waf['commandGroups'].ContainsKey('managed-rules')) {
+       $waf['commandGroups']['managed-rules'] = @{
+          names = @('network', 'front-door', 'waf-policy', 'managed-rules')
+          commandGroups = @{}
+       }
+    }
+
+    $managedRules = $waf['commandGroups']['managed-rules']
+    if (-not $managedRules.ContainsKey('commandGroups')) { $managedRules['commandGroups'] = @{} }
+    $managedRules['commandGroups']['exception'] = @{
+       names = @('network', 'front-door', 'waf-policy', 'managed-rules', 'exception')
+       commands = @{}
+    }
+
+    foreach ($cmdName in @('add', 'list', 'remove')) {
+       $managedRules['commandGroups']['exception']['commands'][$cmdName] = @{
+          names = @('network', 'front-door', 'waf-policy', 'managed-rules', 'exception', $cmdName)
+          registered = $true
+          version = '2025-11-01'
+       }
+    }
+
+    Invoke-RestMethod -Method Put -Uri "$base/CLI/Az/Extension/Modules/front-door" `
+       -ContentType 'application/json' `
+       -Body ($module | ConvertTo-Json -Depth 100)
+    ```
+8. **Verify AAZ, generate CLI, and lint.** If step 7 already performed the `PUT`, it has triggered code generation; `generate_cli.py` is still useful when only updating versions for already-registered commands.
+    ```powershell
+    . .github\skills\azure-cli-skill\scripts\use_aaz_dev_env.ps1
+    aaz-dev command-model verify -a aaz -t network/front-door
+    azdev linter front-door -t command_groups commands params
+    ```
+
+After generation, inspect `git status --short` in both `aaz` and `extension`, and confirm the new Python files exist under the extension AAZ tree. For the Front Door WAF exception example, expect files such as:
+
+```text
+extension/src/front-door/azext_front_door/aaz/latest/network/front_door/waf_policy/managed_rules/exception/_add.py
+extension/src/front-door/azext_front_door/aaz/latest/network/front_door/waf_policy/managed_rules/exception/_list.py
+extension/src/front-door/azext_front_door/aaz/latest/network/front_door/waf_policy/managed_rules/exception/_remove.py
+```
+
+Ignore unrelated dirty files and do not hand-edit generated AAZ Python to fix command shape.
+
+For array subresource commands, check generated index and long option metadata before opening or updating an extension PR. AAZ may generate selector/index args without enough linter metadata. Fix the AAZ resource model first, then regenerate extension code. For example:
+
+- Add `help` for generated index args such as `--exception-index` on `add` and `remove` commands.
+- Add a shorter alias when all options are longer than the linter threshold, such as `--selector-operator` alongside `--selector-match-operator`.
+- Add at least one example for each newly modified command that CI checks with `missing_command_example`. In AAZ command markdown, example blocks must use spaces, not tabs: four spaces before ```bash and eight spaces before command lines, or the aaz-dev parser will ignore the example.
+- Re-run `azdev linter front-door -t help_entries command_groups commands params`; full local linter may still end with `invalid git repo: None` after all rules pass.
+
+## Before Push Checklist
+
+Complete this checklist before pushing extension or AAZ PR branches. Do not rely on CI to discover these issues after the branch is already pushed.
+
+- **Version and changelog:** update the extension `setup.py` version and `HISTORY.rst` before the first push when the generated command surface changes. For `src/front-door`, bump `src/front-door/setup.py` and add a top changelog entry in `src/front-door/HISTORY.rst`.
+- **Examples:** ensure every newly modified registered command has at least one example in AAZ markdown and in generated Python docstrings. For diff-aware CI, run the closest local check, for example:
+   ```powershell
+   Push-Location extension
+   ..\azdev\Scripts\azdev.exe linter front-door --repo ./ --src <branch-name> --tgt <merge-base-sha> --rules missing_command_example
+   Pop-Location
+   ```
+   If local azdev reports `No commands selected to check`, still inspect the generated `_*.py` docstring and AAZ specs endpoint to confirm the example is present.
+- **Linter:** run a local CI-like linter pass that includes help, command group, command, and parameter rules:
+   ```powershell
+   azdev linter front-door -t help_entries command_groups commands params
+   ```
+- **Tests:** run the focused scenario test for the new command surface after adding or updating coverage, for example:
+   ```powershell
+   .\azdev\Scripts\azdev.exe test test_waf_policy_managed_rules_exceptions --profile latest
+   ```
+- **Generated artifacts:** re-run syntax checks for touched generated/test Python files and remove validation-only `__pycache__` artifacts before committing.
+- **Final diff check:** inspect `git diff --name-status <merge-base>...HEAD` before push. The Front Door command PR should contain only front-door source/test/recording/version/changelog files; AAZ PR should contain only command model/resource files.
 
 ## Checks Before Removing A Pin
 

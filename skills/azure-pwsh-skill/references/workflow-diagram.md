@@ -27,13 +27,16 @@ flowchart TD
     Analyze --> NewTests{{"Manual + Copilot:<br/>write Pester tests for new cmdlets +<br/>fill example placeholders"}}
     NewTests --> AskTest{{"Run tests?"}}
     AskTest -- Yes --> RunTest[["test-module.ps1 -Record"]]
-    AskTest -- No --> AskCommit
+    AskTest -- No --> PrePushCI
     RunTest -- Fail --> FixTest[Fix] --> RunTest
-    RunTest -- Pass --> AskCommit{{"Commit?"}}
+    RunTest -- Pass --> PrePushCI[["pre-push CI parity:<br/>diff check + build + static analysis<br/>+ targeted playback/record"]]
+    PrePushCI -- Fail --> FixCI[Fix] --> PrePushCI
+    PrePushCI -- Pass --> AskCommit{{"Commit/push?"}}
 
     AskCommit -- Yes --> Commit[["git add src/&lt;Module&gt;/<br/>git commit"]]
     AskCommit -- No --> End
-    Commit --> End([Done])
+    Commit --> PushPR[["git push<br/>create/update PR"]]
+    PushPR --> End([Done])
 
     classDef script fill:#d4edda,stroke:#28a745,color:#000;
     classDef manual fill:#fff3cd,stroke:#ffc107,color:#000;
@@ -41,7 +44,7 @@ flowchart TD
     classDef tool fill:#e2e3e5,stroke:#6c757d,color:#000;
     class Bootstrap,Activate,Diff,Analyze script;
     class Review1,UpdateReadme,Approve1,ReviewCustom,NewTests,AskTest,AskCommit manual;
-    class AutoRest,Build,RunTest,Commit tool;
+    class AutoRest,Build,RunTest,PrePushCI,Commit,PushPR tool;
     class Init decision;
 ```
 
