@@ -59,6 +59,13 @@ PINNED_COMMAND_VERSIONS = {
         "cdn profile deployment-version show": "2025-09-01-preview",
         "cdn profile deployment-version update": "2025-09-01-preview",
     },
+    ("cdn", "2026-04-01-preview"): {
+        "cdn profile deployment-version approve": "2025-09-01-preview",
+        "cdn profile deployment-version compare": "2025-09-01-preview",
+        "cdn profile deployment-version list": "2025-09-01-preview",
+        "cdn profile deployment-version show": "2025-09-01-preview",
+        "cdn profile deployment-version update": "2025-09-01-preview",
+    },
 }
 
 UPDATE_EXAMPLE_PATTERNS = {

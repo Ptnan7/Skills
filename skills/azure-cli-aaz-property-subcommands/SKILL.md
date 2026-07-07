@@ -32,8 +32,21 @@ Use this skill when any of these signals appear:
 - A command markdown under `aaz/Commands/...` has old versions but lacks the target version.
 - The target resource cfg under `aaz/Resources/.../<target-version>.xml` contains the nested property and args/props.
 - The extension has generated parent commands with the nested property, but a separate child command still points at an old API.
+- `generate_cli.py` fails with `Version '<target-version>' of command '<command>' not exist in AAZ` and the command markdown comment includes a nested property path.
 
 Do not use this skill when the command maps to a normal swagger operation path. Use `azure-cli-skill` for ordinary operation/resource generation.
+
+## Known CDN/AFD Property Subcommands
+
+Check this list before deciding that a missing target command model must be pinned:
+
+| Command group | Parent resource | Property arg/path | Current caution |
+|---------------|-----------------|-------------------|-----------------|
+| `afd profile log-scrubbing` | `/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/profiles/{}` | `properties.logScrubbing` | Some extension profiles register only `show`; avoid expanding create/update/delete surface by accident. |
+| `afd rule action` | `/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/profiles/{}/rulesets/{}/rules/{}` | `properties.actions[]` / `$rule.properties.actions` | Generate/refresh all registered verbs for the target API before pinning. |
+| `afd rule condition` | `/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/profiles/{}/rulesets/{}/rules/{}` | `properties.conditions[]` / `$rule.properties.conditions` | Generate/refresh all registered verbs for the target API before pinning. |
+
+If a new CDN/AFD command joins this list during an upgrade, update both this section and `azure-cli-skill/issues/cdn-missing-target-command-model.md` so future runs classify it correctly.
 
 ## Current Example: AFD Profile Log Scrubbing
 
@@ -90,6 +103,8 @@ Generate it through the AAZ Web UI/workspace APIs, then export and generate the 
 6. **Remove stale pins.** Remove the command from `PINNED_COMMAND_VERSIONS` only after the AAZ command markdown has a real target-version entry and the linked resource cfg contains the property command model.
 7. **Generate CLI.** Run the normal generation flow from `azure-cli-skill`.
 8. **Validate.** Confirm the generated Python uses the target API, then run syntax checks and linter.
+
+If the failure came from `generate_cli.py`, repeat the same generate command after refreshing the subcommand. Do not grow `PINNED_COMMAND_VERSIONS` until the property-subcommand path has been checked and either ruled out or intentionally deferred.
 
 ## Generate New Subresource Commands
 
@@ -154,6 +169,15 @@ Use this workflow when the parent command model exists and the goal is to create
        -ContentType 'application/json' `
        -Body '{"name":"network front-door waf-policy managed-rules exception remove"}'
     ```
+    **Important:** perform required renames before the first Export. If `create/delete` are exported first and then renamed to `add/remove`, the AAZ repo can be left with stale `_create.md`/`_delete.md` files or readme links. Later exports may fail with `Invalid Command Tree`, `FileNotFoundError` for `_create.md`, or a Jinja `None has no attribute 'names'` error while rendering the command group readme.
+
+    Before exporting, verify the workspace command group has exactly the intended public leaves:
+    ```powershell
+    $node = Invoke-RestMethod -Method Get `
+       -Uri "$base/AAZ/Editor/Workspaces/$ws/CommandTree/Nodes/aaz/network/front-door/waf-policy/managed-rules/exception"
+    $node.commands.PSObject.Properties.Name | Sort-Object
+    ```
+    For existing CDN/AFD surfaces, expected examples include `afd rule action add/list/remove/show/update` and `afd rule condition add/list/remove/show/update`, not `create/delete`.
 6. **Export the workspace.** This is equivalent to clicking **EXPORT** in the Web UI:
     ```powershell
     Invoke-RestMethod -Method Post -Uri "$base/AAZ/Editor/Workspaces/$ws/Generate"
@@ -214,6 +238,24 @@ For array subresource commands, check generated index and long option metadata b
 - Add a shorter alias when all options are longer than the linter threshold, such as `--selector-operator` alongside `--selector-match-operator`.
 - Add at least one example for each newly modified command that CI checks with `missing_command_example`. In AAZ command markdown, example blocks must use spaces, not tabs: four spaces before ```bash and eight spaces before command lines, or the aaz-dev parser will ignore the example.
 - Re-run `azdev linter front-door -t help_entries command_groups commands params`; full local linter may still end with `invalid git repo: None` after all rules pass.
+
+### Recovering From A Bad Subcommand Export
+
+If a property subcommand was exported with the wrong default verbs, clean the generated AAZ command tree before retrying. Do not leave both `create/delete` and `add/remove` for the same public surface.
+
+1. Remove stale command markdown that was generated only by the bad export, such as:
+   ```text
+   aaz/Commands/afd/rule/action/_create.md
+   aaz/Commands/afd/rule/action/_delete.md
+   aaz/Commands/afd/rule/condition/_create.md
+   aaz/Commands/afd/rule/condition/_delete.md
+   ```
+2. Remove matching stale links from the command group `readme.md` files. AAZ-dev loads command groups from those readmes; stale links can keep pointing at deleted files and cause export failures.
+3. Remove any untracked target-version resource XML/JSON created by the bad export for that subcommand if it references the wrong leaves.
+4. Restart `aaz-dev` so its command tree cache reloads from the cleaned AAZ repo.
+5. Create a fresh workspace or regenerate the subresource commands, apply all required renames, verify the workspace leaves, then export once.
+
+For CDN/AFD rule action and condition, the safe order is: generate `$rule.properties.actions` / `$rule.properties.conditions`, rename `create -> add` and `delete -> remove`, verify leaves are `add/list/remove/show/update`, then Export.
 
 ## Before Push Checklist
 

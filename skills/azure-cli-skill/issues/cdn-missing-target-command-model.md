@@ -8,15 +8,30 @@ This happens because the standard helper updates every `command.version` and `wa
 
 ## Rule
 
-Do not blindly force every CDN/AFD command to the target API. Before PUTing the module for CLI generation:
+Do not blindly force every CDN/AFD command to the target API. Also do not immediately add every missing command to the pin list. A `Version '<target-version>' of command '<command>' not exist in AAZ` error often means the command is a property/subresource subcommand that should be regenerated for the target API first.
+
+Before PUTing the module for CLI generation:
 
 1. Check each generated command under `aaz/Commands/cdn/**/_*.md` and `aaz/Commands/afd/**/_*.md`.
 2. Confirm it has a `### [<target-version>]` entry.
-3. For nested/property commands, also confirm the linked resource cfg contains the actual command model or command group.
-4. If the target model is missing, keep the command's existing working API version in the module payload.
-5. After generation, scan old API references and confirm every hit is in the approved pin list.
+3. If the command markdown comment ends with a property path such as `properties.logScrubbing`, `properties.actions[]`, or `properties.conditions[]`, classify it as a property/subresource subcommand and follow `azure-cli-aaz-property-subcommands` to refresh or generate the command model for the target API.
+4. For nested/property commands, confirm the linked target resource cfg contains the property and the generated command model or command group. If the target resource has the property but the command model is missing, prefer generating the target subcommand over pinning.
+5. Pin only when the target swagger/resource cfg lacks the property, the AAZ generator cannot generate the subcommand correctly, or the command surface is intentionally not being refreshed in this upgrade.
+6. After generation, scan old API references and confirm every hit is in the approved pin list.
 
 Do not add a markdown-only version entry unless the linked resource cfg really contains the command model. A markdown entry without a real cfg command model can still fail generation.
+
+## Property/Subresource Candidates To Regenerate Before Pinning
+
+Maintain this list as CDN/AFD upgrades reveal property subcommands. When any of these fail with a missing target command model, check the target resource cfg and try the property-subcommand workflow before adding a pin.
+
+| Command group | Parent resource | Property arg/path | Notes |
+|---------------|-----------------|-------------------|-------|
+| `afd profile log-scrubbing` | `/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/profiles/{}` | `properties.logScrubbing` | Existing CLI may only register `show`; do not expose extra verbs unless requested. |
+| `afd rule action` | `/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/profiles/{}/rulesets/{}/rules/{}` | `properties.actions[]` / `$rule.properties.actions` | Refresh all registered verbs together. |
+| `afd rule condition` | `/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/profiles/{}/rulesets/{}/rules/{}` | `properties.conditions[]` / `$rule.properties.conditions` | Refresh all registered verbs together. |
+
+For rule action/condition, AAZ subresource generation may default to `create/delete`. Existing CLI registration uses `add/remove`, so rename `create -> add` and `delete -> remove` before the first Export. If the wrong verbs were already exported, clean stale `_create.md`/`_delete.md` files and readme links, restart `aaz-dev`, then regenerate/rename in a fresh workspace. See `azure-cli-aaz-property-subcommands` for the full recovery flow.
 
 ## Known 2025-09-01-preview Pins
 

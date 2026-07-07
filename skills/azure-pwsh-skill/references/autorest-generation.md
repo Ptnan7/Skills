@@ -71,13 +71,25 @@ Common patterns in `custom/` files:
 
 ---
 
-## Step 4: Build the Module
+## Step 4: Build the Module Once
 
 1. Inform the user you are about to run `pwsh -File ./build-module.ps1`.
 2. Wait for approval.
 3. Run `pwsh -File ./build-module.ps1`.
 4. If the build fails, follow the same fix loop as Step 2.
-5. After a successful build, record the exported cmdlets from `exports/`.
+5. After a successful build, record the exported cmdlets from `exports/`. This first build refreshes exports, generated examples, docs, manifests, and autogen helper files, but docs/help may still reflect placeholder or stale example content.
+
+---
+
+## Step 5: Update Examples And Rebuild Docs
+
+1. Run the module analyzer to find new/removed cmdlets and unfilled examples:
+   ```powershell
+   & .github\skills\azure-pwsh-skill\scripts\analyze_module.ps1 -Module <Name>
+   ```
+2. Update generated `examples/*.md` files for new or changed public cmdlets. Keep examples aligned with the current generated parameters and avoid previous-version behavior.
+3. If examples are edited or generated examples changed, run `pwsh -File ./build-module.ps1` a second time. This second build regenerates final `docs/`, packaged help under the module folder, manifests, and exports from the updated examples.
+4. If the second build fails, follow the same scoped fix loop as Step 2.
 
 ---
 
@@ -99,7 +111,7 @@ Common valid fixes:
 
 ---
 
-## Step 5: Run Tests
+## Step 6: Run Tests
 
 After a successful build, **ask the user whether to run unit tests**. Do not run tests automatically.
 
@@ -110,7 +122,7 @@ After a successful build, **ask the user whether to run unit tests**. Do not run
 
 ---
 
-## Step 6: Commit
+## Step 7: Commit
 
 After tests pass (or were skipped), **ask the user whether to commit the changes**. Do not commit automatically.
 
