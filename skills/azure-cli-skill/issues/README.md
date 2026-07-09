@@ -9,6 +9,5 @@ Use these runbooks when a CDN/AFD swagger or AAZ generation task hits a known fa
 | [azdev-test-missing-setup.md](azdev-test-missing-setup.md) | `azdev test` fails with `Unable to retrieve CLI repo path from config`. |
 | [front-door-legacy-files-tests.md](front-door-legacy-files-tests.md) | Front Door work touches legacy files or legacy non-WAF tests fail. |
 | [cdn-ruleset-update-drops-rule-name.md](cdn-ruleset-update-drops-rule-name.md) | `cdn profile rule-set update` drops `rules[].ruleName` from local `.aaz_dev` `instanceUpdate` cfg before Export. |
-| [cdn-missing-target-command-model.md](cdn-missing-target-command-model.md) | CDN CLI generation fails because an existing command has no AAZ command model for the target API version. |
 | [cdn-custom-arg-conflicts-generated.md](cdn-custom-arg-conflicts-generated.md) | `azdev linter cdn` fails with `AAZConflictFieldDefinitionError` because a custom class re-defines args that the new generated schema already includes. |
 | [azdev-linter-invalid-git-repo.md](azdev-linter-invalid-git-repo.md) | `azdev linter` exits with code 1 and logs `invalid git repo: None` even though all static lint rules passed. |

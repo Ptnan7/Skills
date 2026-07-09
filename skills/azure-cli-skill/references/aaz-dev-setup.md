@@ -302,7 +302,7 @@ This is equivalent to clicking Export in the Web UI — it writes command models
 
 After Export is done, **first verify the aaz repo has changes** (`git -C $env:AAZ_PATH status --short` must be non-empty), then generate. The script walks `profiles.latest`, bumps every `command.version` and `waitCommand.version` to the target, and PUTs the module back — which triggers CLI code generation.
 
-> **CDN version-pinning check**: For `--ext cdn`, do not assume every command can move to the target API. Before PUTing the module, apply [CDN Command Missing Target AAZ Model](../issues/cdn-missing-target-command-model.md) and keep commands without target AAZ command models on their existing working API.
+> **CDN property-subcommand check**: For `--ext cdn`, if generation reports a missing target AAZ command model for a nested/property command, load `azure-cli-aaz-property-subcommands` and recreate or refresh the target subcommand before regenerating CLI.
 
 ```powershell
 # Front Door

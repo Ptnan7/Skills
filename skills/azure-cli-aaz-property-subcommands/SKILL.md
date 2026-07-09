@@ -38,15 +38,15 @@ Do not use this skill when the command maps to a normal swagger operation path. 
 
 ## Known CDN/AFD Property Subcommands
 
-Check this list before deciding that a missing target command model must be pinned:
+Check this list when a missing target command model might be a nested/property subcommand:
 
 | Command group | Parent resource | Property arg/path | Current caution |
 |---------------|-----------------|-------------------|-----------------|
 | `afd profile log-scrubbing` | `/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/profiles/{}` | `properties.logScrubbing` | Some extension profiles register only `show`; avoid expanding create/update/delete surface by accident. |
-| `afd rule action` | `/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/profiles/{}/rulesets/{}/rules/{}` | `properties.actions[]` / `$rule.properties.actions` | Generate/refresh all registered verbs for the target API before pinning. |
-| `afd rule condition` | `/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/profiles/{}/rulesets/{}/rules/{}` | `properties.conditions[]` / `$rule.properties.conditions` | Generate/refresh all registered verbs for the target API before pinning. |
+| `afd rule action` | `/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/profiles/{}/rulesets/{}/rules/{}` | `properties.actions[]` / `$rule.properties.actions` | Generate/refresh all registered verbs for the target API. |
+| `afd rule condition` | `/subscriptions/{}/resourcegroups/{}/providers/microsoft.cdn/profiles/{}/rulesets/{}/rules/{}` | `properties.conditions[]` / `$rule.properties.conditions` | Generate/refresh all registered verbs for the target API. |
 
-If a new CDN/AFD command joins this list during an upgrade, update both this section and `azure-cli-skill/issues/cdn-missing-target-command-model.md` so future runs classify it correctly.
+If a new CDN/AFD command joins this list during an upgrade, update this section so future runs classify it correctly.
 
 ## Current Example: AFD Profile Log Scrubbing
 
