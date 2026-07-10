@@ -330,6 +330,8 @@ After generation, the script asks whether to run linter. For `front-door`, it ru
 
 After CLI generation, do not require a generated diff review gate. Ask the user only whether to run `azdev linter <ext>`. If the user says yes, run linter. If the user says no, record that linter was skipped and continue to version/changelog work. Do not run `azdev test` from this skill.
 
+Before commit, push, or PR creation, check whether the touched extension needs release metadata updates. For `src/cdn` and `src/front-door`, inspect at least `HISTORY.rst`, `setup.py`, and the extension package `__init__.py`; also check any relevant `ChangeLog.md`, `history`, `settings.py`/`setting.py`, or repo-specific metadata files when present. If no metadata change is needed, state that explicitly before staging. Also confirm the active GitHub CLI account with `gh auth status`; if the active account cannot create cross-fork PRs, switch to the fork owner account and retry.
+
 ```powershell
 # Optional: inspect extension repo changes if needed
 git diff --stat src/front-door/   # or src/cdn/
